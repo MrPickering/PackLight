@@ -87,12 +87,12 @@ export const COMPARTMENT_META: Record<Compartment, { label: string; emoji: strin
 };
 
 export const TERRAIN_META: Record<TerrainType, { label: string; emoji: string; description: string }> = {
-  summit: { label: 'Summit', emoji: '🏔️', description: 'On top of the world. Everything clicking.' },
-  downhill: { label: 'Downhill', emoji: '⛷️', description: 'Momentum is carrying you. Enjoy the glide.' },
-  camp: { label: 'Camp', emoji: '⛺', description: 'Resting, regrouping. Steady ground.' },
-  uphill: { label: 'Uphill', emoji: '🥾', description: 'Grinding toward something. Every step costs more.' },
-  ridge: { label: 'Ridge', emoji: '🏞️', description: 'Narrow path, high stakes. Focus required.' },
-  swamp: { label: 'Swamp', emoji: '🌿', description: 'Stuck, foggy, heavy. Hard to see the way out.' },
+  summit: { label: 'Great', emoji: '😊', description: 'Things are clicking. Energy is high.' },
+  downhill: { label: 'Good', emoji: '👍', description: 'Coasting a bit. Feels manageable.' },
+  camp: { label: 'Steady', emoji: '🤙', description: 'Nothing dramatic. Holding it together.' },
+  uphill: { label: 'Tough', emoji: '😤', description: 'Pushing through something. It\'s taking effort.' },
+  ridge: { label: 'Tense', emoji: '😬', description: 'High pressure. Not much room for error.' },
+  swamp: { label: 'Stuck', emoji: '😶‍🌫️', description: 'Heavy, foggy, hard to move. Can\'t see clearly.' },
 };
 
 export const AGENTS: Record<AgentId, Agent> = {
@@ -134,7 +134,7 @@ export const AGENTS: Record<AgentId, Agent> = {
     title: 'Goal Portfolio Manager',
     emoji: '🧭',
     description: 'Tracks goals, recalculates timelines, and celebrates progress.',
-    systemPrompt: 'You are The Navigator, a goal portfolio manager for PackLight. You maintain the user\'s goal portfolio — tracking progress, recalculating timelines when pack weight changes, and identifying when goals conflict. You surface when a Map is stale or when terrain changes require route adjustment. You celebrate summit moments. Be visionary but grounded. Keep responses concise.',
+    systemPrompt: 'You are The Navigator, a goal portfolio manager for PackLight. You maintain the user\'s goal portfolio — tracking progress, recalculating timelines when load changes, and identifying when goals conflict. You surface when a goal is stale or when life circumstances shift. You celebrate wins. Be visionary but grounded. Keep responses concise.',
   },
   archivist: {
     id: 'archivist',

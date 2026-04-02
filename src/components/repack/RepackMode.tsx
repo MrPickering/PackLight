@@ -325,7 +325,7 @@ export default function RepackMode() {
 
           {step === 'terrain' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-400">Has your terrain changed?</p>
+              <p className="text-sm text-slate-400">How does life feel now?</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {(['summit', 'downhill', 'camp', 'uphill', 'ridge', 'swamp'] as TerrainType[]).map(t => {
                   const meta = TERRAIN_META[t];
