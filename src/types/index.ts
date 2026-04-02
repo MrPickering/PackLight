@@ -25,6 +25,7 @@ export interface PackItem {
   createdAt: string;
   updatedAt: string;
   droppedAt?: string;
+  releaseNote?: string;
   tags: string[];
   agentNotes: AgentNote[];
   weightHistory: { date: string; value: number }[];

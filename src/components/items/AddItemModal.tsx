@@ -5,6 +5,7 @@ import { usePackStore } from '../../store';
 import { COMPARTMENT_META, WEIGHT_LABELS, UTILITY_LABELS } from '../../types';
 import type { Compartment, PackItem } from '../../types';
 import Slider from '../shared/Slider';
+import ReleaseRitualModal from './ReleaseRitualModal';
 
 interface Props {
   onClose: () => void;
@@ -17,7 +18,6 @@ const COMPARTMENTS: Compartment[] = ['stones', 'chains', 'tools', 'provisions', 
 export default function AddItemModal({ onClose, editItem, defaultCompartment }: Props) {
   const addItem = usePackStore(s => s.addItem);
   const updateItem = usePackStore(s => s.updateItem);
-  const dropItem = usePackStore(s => s.dropItem);
 
   const [name, setName] = useState(editItem?.name ?? '');
   const [compartment, setCompartment] = useState<Compartment>(editItem?.compartment ?? defaultCompartment ?? 'stones');
@@ -25,7 +25,7 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment }: 
   const [utility, setUtility] = useState(editItem?.utility ?? 5);
   const [description, setDescription] = useState(editItem?.description ?? '');
   const [tags, setTags] = useState(editItem?.tags.join(', ') ?? '');
-  const [showDropConfirm, setShowDropConfirm] = useState(false);
+  const [showReleaseRitual, setShowReleaseRitual] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +39,6 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment }: 
       addItem({ name, compartment, weight, utility, description, tags: parsedTags });
     }
     onClose();
-  };
-
-  const handleDrop = () => {
-    if (editItem) {
-      dropItem(editItem.id);
-      onClose();
-    }
   };
 
   return (
@@ -152,28 +145,24 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment }: 
               </button>
 
               {editItem && !editItem.droppedAt && (
-                <>
-                  {showDropConfirm ? (
-                    <button
-                      type="button"
-                      onClick={handleDrop}
-                      className="px-4 py-2.5 bg-rose-500 text-white rounded-lg text-sm font-medium hover:bg-rose-400 transition-colors"
-                    >
-                      Confirm Drop
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowDropConfirm(true)}
-                      className="px-4 py-2.5 bg-slate-800 text-rose-400 rounded-lg text-sm hover:bg-slate-700 transition-colors"
-                    >
-                      Drop Item
-                    </button>
-                  )}
-                </>
+                <button
+                  type="button"
+                  onClick={() => setShowReleaseRitual(true)}
+                  className="px-4 py-2.5 bg-slate-800 text-amber-400 rounded-lg text-sm hover:bg-slate-700 transition-colors"
+                >
+                  Release
+                </button>
               )}
             </div>
           </form>
+
+          {showReleaseRitual && editItem && (
+            <ReleaseRitualModal
+              item={editItem}
+              onClose={() => setShowReleaseRitual(false)}
+              onComplete={onClose}
+            />
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>

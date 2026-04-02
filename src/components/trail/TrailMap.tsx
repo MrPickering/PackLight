@@ -160,32 +160,39 @@ export default function TrailMap() {
         </div>
       )}
 
-      {/* Dropped weight history */}
+      {/* Released items */}
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-slate-400 flex items-center gap-2">
-          <TrendingDown size={14} /> Dropped Weight
+          <TrendingDown size={14} /> Released
           {totalDroppedWeight > 0 && (
-            <span className="font-mono text-emerald-400 text-xs">-{totalDroppedWeight} total</span>
+            <span className="font-mono text-emerald-400 text-xs">-{totalDroppedWeight} total weight</span>
           )}
         </h2>
         {droppedItems.length > 0 ? (
-          <div className="space-y-1">
+          <div className="space-y-2">
             {droppedItems.map(item => (
-              <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-slate-900 border border-slate-800 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{COMPARTMENT_META[item.compartment].emoji}</span>
-                  <span className="text-sm text-slate-400">{item.name}</span>
+              <div key={item.id} className="py-3 px-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{COMPARTMENT_META[item.compartment].emoji}</span>
+                    <span className="text-sm text-slate-400">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-emerald-400 font-mono">-{item.weight}</span>
+                    <span className="text-slate-600">{new Date(item.droppedAt!).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-emerald-400 font-mono">-{item.weight}</span>
-                  <span className="text-slate-600">{new Date(item.droppedAt!).toLocaleDateString()}</span>
-                </div>
+                {item.releaseNote && (
+                  <p className="text-xs text-slate-600 italic border-l-2 border-slate-800 pl-3 ml-6">
+                    "{item.releaseNote}"
+                  </p>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-6 bg-slate-900 border border-slate-800 rounded-xl">
-            <p className="text-slate-600 text-sm italic">Nothing dropped yet. When you're ready to let go, your freed weight shows up here.</p>
+            <p className="text-slate-600 text-sm italic">Nothing released yet. When you're ready to let go, your witnessed releases show up here.</p>
           </div>
         )}
       </div>

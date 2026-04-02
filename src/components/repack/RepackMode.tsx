@@ -5,6 +5,7 @@ import { usePackStore } from '../../store';
 import { AGENTS, TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { TerrainType, PackItem } from '../../types';
 import { calculatePaceScore } from '../../utils/paceScore';
+import ReleaseRitualModal from '../items/ReleaseRitualModal';
 
 type Step = 'review' | 'briefing' | 'triage' | 'terrain' | 'summary';
 const STEPS: Step[] = ['review', 'briefing', 'triage', 'terrain', 'summary'];
@@ -32,6 +33,8 @@ export default function RepackMode() {
   const [triageActions, setTriageActions] = useState<Record<string, 'keep' | 'drop' | 'lighten'>>({});
   const [lightenExpanded, setLightenExpanded] = useState<string | null>(null);
   const [triageNextStep, setTriageNextStep] = useState<Record<string, string>>({});
+  const [releaseQueue, setReleaseQueue] = useState<PackItem[]>([]);
+  const [currentReleaseItem, setCurrentReleaseItem] = useState<PackItem | null>(null);
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -68,9 +71,24 @@ export default function RepackMode() {
   };
 
   const applyTriage = () => {
-    Object.entries(triageActions).forEach(([id, action]) => {
-      if (action === 'drop') dropItem(id);
-    });
+    const itemsToDrop = Object.entries(triageActions)
+      .filter(([, action]) => action === 'drop')
+      .map(([id]) => items.find(i => i.id === id)!)
+      .filter(Boolean);
+
+    if (itemsToDrop.length > 0) {
+      setReleaseQueue(itemsToDrop.slice(1));
+      setCurrentReleaseItem(itemsToDrop[0]);
+    }
+  };
+
+  const handleReleaseComplete = () => {
+    if (releaseQueue.length > 0) {
+      setCurrentReleaseItem(releaseQueue[0]);
+      setReleaseQueue(prev => prev.slice(1));
+    } else {
+      setCurrentReleaseItem(null);
+    }
   };
 
   const finalScore = useMemo(() => {
@@ -394,6 +412,16 @@ export default function RepackMode() {
             {step === 'terrain' ? 'Finish Repack' : 'Next'} <ArrowRight size={16} />
           </button>
         </div>
+      )}
+      {currentReleaseItem && (
+        <ReleaseRitualModal
+          item={currentReleaseItem}
+          onClose={() => {
+            setCurrentReleaseItem(null);
+            setReleaseQueue([]);
+          }}
+          onComplete={handleReleaseComplete}
+        />
       )}
     </div>
   );

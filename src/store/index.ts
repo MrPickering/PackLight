@@ -15,7 +15,7 @@ interface PackStore {
   // Item actions
   addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps'>) => void;
   updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags'>>) => void;
-  dropItem: (id: string) => void;
+  dropItem: (id: string, releaseNote?: string) => void;
   restoreItem: (id: string) => void;
 
   // Lightening actions
@@ -94,11 +94,13 @@ export const usePackStore = create<PackStore>()(
         }));
       },
 
-      dropItem: (id) => {
+      dropItem: (id, releaseNote) => {
         const now = new Date().toISOString();
         set(state => ({
           items: state.items.map(item =>
-            item.id === id ? { ...item, droppedAt: now, updatedAt: now } : item,
+            item.id === id
+              ? { ...item, droppedAt: now, updatedAt: now, ...(releaseNote ? { releaseNote } : {}) }
+              : item,
           ),
         }));
       },
