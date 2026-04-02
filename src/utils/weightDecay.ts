@@ -37,17 +37,17 @@ export function runWeightDecay(items: PackItem[]): { updatedItems: PackItem[]; n
         if (days >= 60) {
           copy.utility = Math.max(1, item.utility - 0.3);
           copy.utilityHistory = [...item.utilityHistory, { date: now, value: copy.utility }];
-          allNotes.push(makeNote('blacksmith', `Your "${item.name}" skill hasn't been used in ${days} days. Skill rust is setting in — utility has decreased slightly. Use it or schedule practice.`, item.id));
+          allNotes.push(makeNote('blacksmith', `Your "${item.name}" ability hasn't been used in ${days} days. Skills lose sharpness without practice — utility has decreased slightly.`, item.id));
         }
         break;
       case 'maps':
         if (days >= 30) {
-          allNotes.push(makeNote('navigator', `"${item.name}" hasn't been updated in ${days} days. Is this goal still on your horizon, or has the route changed?`, item.id));
+          allNotes.push(makeNote('navigator', `"${item.name}" hasn't been updated in ${days} days. Is this goal still active, or has your direction changed?`, item.id));
         }
         break;
       case 'souvenirs':
         if (days >= 45) {
-          allNotes.push(makeNote('archivist', `You haven't visited "${item.name}" in ${days} days. Remember what this means to you — some treasures need tending.`, item.id));
+          allNotes.push(makeNote('archivist', `You haven't revisited "${item.name}" in ${days} days. The parts of your identity that matter need regular attention.`, item.id));
         }
         break;
     }

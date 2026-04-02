@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType } from '../types';
+import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck } from '../types';
 import { calculatePaceScore } from '../utils/paceScore';
+import { calculateLoadBalance } from '../utils/loadBalance';
 import { runWeightDecay } from '../utils/weightDecay';
 
 interface PackStore {
@@ -36,8 +37,12 @@ interface PackStore {
   setTerrain: (terrain: TerrainType) => void;
   completeOnboarding: () => void;
 
+  // Recovery
+  addRecoveryCheck: (check: Omit<RecoveryCheck, 'id'>) => void;
+
   // Computed
   getPaceScore: () => number;
+  getLoadBalance: () => { score: number; recovery: number; strain: number };
   getActiveItems: () => PackItem[];
   getDroppedItems: () => PackItem[];
   getCompartmentItems: (compartment: Compartment) => PackItem[];
@@ -58,6 +63,8 @@ export const usePackStore = create<PackStore>()(
         currentTerrain: 'camp' as TerrainType,
         terrainSetAt: new Date().toISOString(),
         paceScoreHistory: [],
+        recoveryHistory: [],
+        loadBalanceHistory: [],
       },
       onboardingComplete: false,
       lastDecayRun: null,
@@ -226,9 +233,24 @@ export const usePackStore = create<PackStore>()(
         set({ onboardingComplete: true });
       },
 
+      addRecoveryCheck: (check) => {
+        const recovery: RecoveryCheck = { ...check, id: crypto.randomUUID() };
+        set(state => ({
+          profile: {
+            ...state.profile,
+            recoveryHistory: [...state.profile.recoveryHistory, recovery],
+          },
+        }));
+      },
+
       getPaceScore: () => {
         const { items, profile } = get();
         return calculatePaceScore(items, profile.currentTerrain);
+      },
+
+      getLoadBalance: () => {
+        const { items, profile } = get();
+        return calculateLoadBalance(items, profile.currentTerrain, profile.recoveryHistory);
       },
 
       getActiveItems: () => get().items.filter(i => !i.droppedAt),
@@ -264,6 +286,18 @@ export const usePackStore = create<PackStore>()(
     }),
     {
       name: 'packlight-store',
+      version: 2,
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 2) {
+          const profile = state.profile as Record<string, unknown>;
+          if (profile) {
+            profile.recoveryHistory = profile.recoveryHistory ?? [];
+            profile.loadBalanceHistory = profile.loadBalanceHistory ?? [];
+          }
+        }
+        return state;
+      },
     },
   ),
 );

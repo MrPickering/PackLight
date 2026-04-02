@@ -2,43 +2,56 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, BookOpen, RefreshCw, TrendingUp, TrendingDown, Minus, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
-import { COMPARTMENT_META, TERRAIN_META } from '../../types';
-import type { Compartment } from '../../types';
+import { COMPARTMENT_META, TERRAIN_META, AGENTS } from '../../types';
+import type { Compartment, AgentId } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
+import RecoveryCheckIn from '../shared/RecoveryCheckIn';
 import { useState } from 'react';
 import AddItemModal from '../items/AddItemModal';
 
 const COMPARTMENTS: Compartment[] = ['stones', 'chains', 'tools', 'provisions', 'maps', 'souvenirs'];
 
 const COMPARTMENT_ACTIONS: Record<Compartment, string> = {
-  stones: 'Reduce weight through processing, therapy, or letting go',
-  chains: 'Renegotiate, automate, or drop obligations that drain you',
-  tools: 'Sharpen skills that serve your goals, retire what\'s rusted',
-  provisions: 'Strengthen your safety nets and close resource gaps',
-  maps: 'Clarify direction, set milestones, and track progress',
-  souvenirs: 'Protect what gives you meaning — tend what matters',
+  stones: 'Process, reframe, or get support for what weighs on you emotionally',
+  chains: 'Renegotiate, share, or set boundaries around your obligations',
+  tools: 'Develop skills that serve you, ease pressure from those that drain you',
+  provisions: 'Strengthen what supports you and close gaps in your safety nets',
+  maps: 'Clarify direction, break goals into steps, and check if the pursuit is sustainable',
+  souvenirs: 'Protect what gives you meaning and update roles that no longer fit',
 };
 
 const EMPTY_STATES: Record<Compartment, string> = {
-  stones: 'No emotional burdens tracked. Add stressors, worries, or grief to start managing them.',
-  chains: 'No obligations tracked. Add debts, commitments, or draining duties here.',
-  tools: 'No skills tracked. Add your capabilities so you can see what serves your goals.',
-  provisions: 'No resources tracked. Add savings, insurance, support networks, etc.',
-  maps: 'No goals tracked. Add what you\'re working toward — career, health, relationships.',
-  souvenirs: 'No meaning items tracked. Add passions, values, and what defines you.',
+  stones: 'No emotions tracked yet. Add what you\'re feeling — good and bad.',
+  chains: 'No responsibilities tracked yet. Add commitments and obligations.',
+  tools: 'No abilities tracked yet. Add your skills and capabilities.',
+  provisions: 'No resources tracked yet. Add what supports and protects you.',
+  maps: 'No goals tracked yet. Add what you\'re working toward.',
+  souvenirs: 'No identity items tracked yet. Add roles, values, and what defines you.',
 };
+
+function scoreColor(score: number): string {
+  if (score >= 70) return 'text-emerald-400';
+  if (score >= 40) return 'text-amber-400';
+  return 'text-rose-400';
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 70) return 'Balanced';
+  if (score >= 40) return 'Managing';
+  return 'Overloaded';
+}
 
 export default function PackView() {
   const navigate = useNavigate();
   const profile = usePackStore(s => s.profile);
-  const getPaceScore = usePackStore(s => s.getPaceScore);
+  const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
   const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
   const getActiveItems = usePackStore(s => s.getActiveItems);
   const agentNotes = usePackStore(s => s.agentNotes);
   const [showAdd, setShowAdd] = useState(false);
 
-  const paceScore = getPaceScore();
+  const balance = getLoadBalance();
   const terrain = TERRAIN_META[profile.currentTerrain];
   const recentNotes = agentNotes.filter(n => n.status === 'pending').slice(0, 3);
   const activeItems = getActiveItems();
@@ -46,10 +59,10 @@ export default function PackView() {
   const totalWeight = activeItems.reduce((s, i) => s + i.weight, 0);
   const totalUtility = activeItems.reduce((s, i) => s + i.utility, 0);
 
-  const prevScore = profile.paceScoreHistory.length > 1
-    ? profile.paceScoreHistory[profile.paceScoreHistory.length - 2]?.value
+  const prevScore = profile.loadBalanceHistory.length > 1
+    ? profile.loadBalanceHistory[profile.loadBalanceHistory.length - 2]?.value
     : null;
-  const trend = prevScore !== null ? paceScore - prevScore : 0;
+  const trend = prevScore !== null ? balance.score - prevScore : 0;
 
   // Find heaviest burdens and strongest assets for the summary
   const heaviest = [...activeItems].filter(i => i.weight > i.utility).sort((a, b) => (b.weight - b.utility) - (a.weight - a.utility)).slice(0, 3);
@@ -72,21 +85,28 @@ export default function PackView() {
         <div className="text-right">
           <div className="flex items-center gap-2 justify-end">
             <motion.span
-              key={paceScore}
+              key={balance.score}
               initial={{ scale: 1.3, opacity: 0.5 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="font-mono text-3xl font-bold text-white"
+              className={`font-mono text-3xl font-bold ${scoreColor(balance.score)}`}
             >
-              {paceScore.toFixed(2)}
+              {balance.score}
             </motion.span>
             {trend > 0 && <TrendingUp size={16} className="text-emerald-400" />}
             {trend < 0 && <TrendingDown size={16} className="text-rose-400" />}
             {trend === 0 && <Minus size={16} className="text-slate-500" />}
           </div>
-          <span className="text-xs text-slate-500">Pace Score (utility / weight)</span>
+          <span className="text-xs text-slate-500">Load Balance</span>
+          <span className={`block text-[10px] ${scoreColor(balance.score)}`}>{scoreLabel(balance.score)}</span>
+          {balance.strain >= 2 && (
+            <span className="text-[10px] text-rose-400">High strain detected</span>
+          )}
         </div>
       </div>
+
+      {/* Recovery check-in */}
+      <RecoveryCheckIn />
 
       {/* Quick insight bar */}
       {activeItems.length > 0 && (
@@ -242,7 +262,7 @@ export default function PackView() {
           </div>
           <AnimatePresence>
             {recentNotes.map(note => {
-              const agent = { geologist: '🪨', locksmith: '🔓', blacksmith: '⚒️', quartermaster: '📦', navigator: '🧭', archivist: '📜' }[note.agentId];
+              const agent = AGENTS[note.agentId as AgentId];
               return (
                 <motion.div
                   key={note.id}
@@ -251,7 +271,7 @@ export default function PackView() {
                   exit={{ opacity: 0, y: -10 }}
                   className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex gap-3"
                 >
-                  <span className="text-lg shrink-0">{agent}</span>
+                  <span className="text-lg shrink-0">{agent?.emoji}</span>
                   <p className="text-sm text-slate-400 line-clamp-2">{note.content}</p>
                 </motion.div>
               );

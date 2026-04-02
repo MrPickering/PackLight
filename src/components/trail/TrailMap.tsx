@@ -30,7 +30,7 @@ export default function TrailMap() {
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - range);
-  const paceHistory = profile.paceScoreHistory
+  const balanceHistory = profile.loadBalanceHistory
     .filter(p => new Date(p.date) >= cutoff)
     .map(p => ({ ...p, date: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }));
 
@@ -125,11 +125,11 @@ export default function TrailMap() {
         </div>
       </div>
 
-      {/* Pace Score chart */}
-      {paceHistory.length > 1 && (
+      {/* Load Balance chart */}
+      {balanceHistory.length > 1 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-400">Pace Score Trend</h2>
+            <h2 className="text-sm font-medium text-slate-400">Load Balance Trend</h2>
             <div className="flex gap-1">
               {RANGE_OPTIONS.map(opt => (
                 <button
@@ -146,9 +146,9 @@ export default function TrailMap() {
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={paceHistory}>
+              <LineChart data={balanceHistory}>
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 2]} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
                   labelStyle={{ color: '#94a3b8' }}

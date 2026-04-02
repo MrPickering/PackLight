@@ -70,11 +70,23 @@ export interface DetectedItem {
   approved: boolean;
 }
 
+export interface RecoveryCheck {
+  id: string;
+  date: string;
+  sleep: number;        // 1-5
+  activity: number;     // 1-5
+  social: number;       // 1-5
+  downtime: number;     // 1-5
+  mindfulness: number;  // 1-5
+}
+
 export interface UserProfile {
   name: string;
   currentTerrain: TerrainType;
   terrainSetAt: string;
   paceScoreHistory: { date: string; value: number }[];
+  recoveryHistory: RecoveryCheck[];
+  loadBalanceHistory: { date: string; value: number }[];
 }
 
 export const COMPARTMENT_META: Record<Compartment, { label: string; emoji: string; color: string }> = {

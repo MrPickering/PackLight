@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   const handleExport = () => {
     const data = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       profile,
       items,
@@ -52,9 +52,14 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.version === 1) {
+        if (data.version === 1 || data.version === 2) {
+          const importedProfile = {
+            ...data.profile,
+            recoveryHistory: data.profile.recoveryHistory ?? [],
+            loadBalanceHistory: data.profile.loadBalanceHistory ?? [],
+          };
           usePackStore.setState({
-            profile: data.profile,
+            profile: importedProfile,
             items: data.items,
             journal: data.journal,
             agentNotes: data.agentNotes,
@@ -72,7 +77,7 @@ export default function SettingsPage() {
       items: [],
       agentNotes: [],
       journal: [],
-      profile: { name: '', currentTerrain: 'camp', terrainSetAt: new Date().toISOString(), paceScoreHistory: [] },
+      profile: { name: '', currentTerrain: 'camp', terrainSetAt: new Date().toISOString(), paceScoreHistory: [], recoveryHistory: [], loadBalanceHistory: [] },
       onboardingComplete: false,
       lastDecayRun: null,
     });

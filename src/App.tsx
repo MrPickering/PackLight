@@ -14,7 +14,7 @@ import Onboarding from './components/onboarding/Onboarding';
 export default function App() {
   const onboardingComplete = usePackStore(s => s.onboardingComplete);
   const checkAndRunDecay = usePackStore(s => s.checkAndRunDecay);
-  const getPaceScore = usePackStore(s => s.getPaceScore);
+  const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const profile = usePackStore(s => s.profile);
   const setProfile = usePackStore(s => s.setProfile);
 
@@ -23,17 +23,17 @@ export default function App() {
     checkAndRunDecay();
   }, [checkAndRunDecay]);
 
-  // Record pace score periodically
+  // Record load balance periodically
   useEffect(() => {
-    const score = getPaceScore();
-    const last = profile.paceScoreHistory[profile.paceScoreHistory.length - 1];
+    const { score } = getLoadBalance();
+    const last = profile.loadBalanceHistory[profile.loadBalanceHistory.length - 1];
     const today = new Date().toISOString().split('T')[0];
     if (!last || last.date.split('T')[0] !== today) {
       setProfile({
-        paceScoreHistory: [...profile.paceScoreHistory, { date: new Date().toISOString(), value: score }],
+        loadBalanceHistory: [...profile.loadBalanceHistory, { date: new Date().toISOString(), value: score }],
       });
     }
-  }, [getPaceScore, profile.paceScoreHistory, setProfile]);
+  }, [getLoadBalance, profile.loadBalanceHistory, setProfile]);
 
   if (!onboardingComplete) {
     return <Onboarding />;

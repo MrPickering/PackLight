@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { AGENTS, TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { TerrainType, PackItem } from '../../types';
-import { calculatePaceScore } from '../../utils/paceScore';
+import { calculateLoadBalance } from '../../utils/loadBalance';
 import ReleaseRitualModal from '../items/ReleaseRitualModal';
 
 type Step = 'review' | 'briefing' | 'triage' | 'terrain' | 'summary';
@@ -59,7 +59,8 @@ export default function RepackMode() {
     return byAgent;
   }, [agentNotes]);
 
-  const initialScore = calculatePaceScore(items, profile.currentTerrain);
+  const recoveryHistory = profile.recoveryHistory ?? [];
+  const initialScore = calculateLoadBalance(items, profile.currentTerrain, recoveryHistory).score;
 
   const handleTriage = (itemId: string, action: 'keep' | 'drop' | 'lighten') => {
     setTriageActions(prev => ({ ...prev, [itemId]: action }));
@@ -96,8 +97,8 @@ export default function RepackMode() {
       if (triageActions[i.id] === 'drop') return { ...i, droppedAt: 'simulated' };
       return i;
     });
-    return calculatePaceScore(simulated as PackItem[], profile.currentTerrain);
-  }, [items, triageActions, profile.currentTerrain]);
+    return calculateLoadBalance(simulated as PackItem[], profile.currentTerrain, recoveryHistory).score;
+  }, [items, triageActions, profile.currentTerrain, recoveryHistory]);
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -352,10 +353,10 @@ export default function RepackMode() {
           {step === 'summary' && (
             <div className="text-center py-8 space-y-6">
               <div className="space-y-2">
-                <p className="text-sm text-slate-400">Pace Score</p>
+                <p className="text-sm text-slate-400">Load Balance</p>
                 <div className="flex items-center justify-center gap-4">
                   <div>
-                    <span className="font-mono text-2xl text-slate-500">{initialScore.toFixed(2)}</span>
+                    <span className="font-mono text-2xl text-slate-500">{initialScore}</span>
                     <span className="block text-[10px] text-slate-600">Before</span>
                   </div>
                   <ArrowRight size={20} className="text-amber-500" />
@@ -366,7 +367,7 @@ export default function RepackMode() {
                       transition={{ type: 'spring', stiffness: 200 }}
                       className="font-mono text-3xl text-amber-400 block"
                     >
-                      {finalScore.toFixed(2)}
+                      {finalScore}
                     </motion.span>
                     <span className="block text-[10px] text-slate-600">After</span>
                   </div>
