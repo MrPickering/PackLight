@@ -14,34 +14,34 @@ type RitualStep = 'acknowledge' | 'speak' | 'release';
 
 const RELEASE_PROMPTS: Record<string, string[]> = {
   stones: [
-    'What weight has this stone added to your pack?',
-    'What would your life look like without it?',
-    'What do you want to say to it before you let go?',
+    'How has this affected your daily life?',
+    'What changes when you stop carrying this?',
+    'Anything you want to say about it before you let go?',
   ],
   chains: [
-    'How has this obligation bound you?',
-    'What becomes possible when this chain breaks?',
-    'What do you want to say as you unlock it?',
+    'How has this responsibility weighed on you?',
+    'What becomes possible when you put this down?',
+    'Anything you want to acknowledge before moving on?',
   ],
   tools: [
-    'How did this tool serve you?',
-    'Why is it time to set it down?',
-    'What do you want to acknowledge about what it gave you?',
+    'How did this ability serve you?',
+    'Why is it time to stop maintaining it?',
+    'Anything you want to acknowledge about what it gave you?',
   ],
   provisions: [
-    'What fear did this provision protect against?',
+    'What did this resource protect you from?',
     'What do you trust now that you didn\'t before?',
-    'What do you want to say as you release the need for it?',
+    'Anything you want to say as you let go of needing this?',
   ],
   maps: [
-    'Where was this goal meant to lead you?',
-    'Why is it no longer your path?',
-    'What do you want to say to this direction before changing course?',
+    'What were you hoping this goal would bring you?',
+    'Why is it no longer the right direction?',
+    'Anything you want to say before changing course?',
   ],
   souvenirs: [
-    'What meaning did this hold for you?',
-    'What of that meaning do you carry in yourself, even without it?',
-    'What do you want to say before you set it down?',
+    'What did this part of your identity mean to you?',
+    'What of that meaning do you carry in yourself, even without this?',
+    'Anything you want to say before you set this down?',
   ],
 };
 

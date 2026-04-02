@@ -12,28 +12,28 @@ const ALL_STEPS: Step[] = ['welcome', 'profile', ...ITEM_STEPS, 'ready'];
 
 const STEP_INTROS: Record<Compartment, { heading: string; subtext: string }> = {
   stones: {
-    heading: 'What\'s weighing on you?',
-    subtext: 'Emotional and psychological burdens — stress, grief, anxiety, self-doubt. Research shows these daily hassles impact health more than major life events (Lazarus, 1981).',
+    heading: 'What are you feeling?',
+    subtext: 'All emotions take energy — grief, anxiety, and shame, but also love, excitement, and hope. The Holmes-Rahe scale rates marriage and personal achievement as significant stressors. Good feelings still weigh something.',
   },
   chains: {
-    heading: 'What are you obligated to?',
-    subtext: 'Commitments that drain your energy — debt, overwork, draining relationships. The APA reports money and work are the #1 and #2 stressors every year since 2007.',
+    heading: 'What are you responsible for?',
+    subtext: 'Every responsibility costs energy — not just the ones you resent. Parenting, leadership, being the reliable friend, keeping a household running. Chosen obligations are still obligations.',
   },
   tools: {
-    heading: 'What skills do you have?',
-    subtext: 'Your capabilities and strengths. The WHO identifies education and skills as key protective factors against chronic stress.',
+    heading: 'What can you do?',
+    subtext: 'Your skills and abilities. These help you carry everything else, but they come with their own weight — the pressure to perform, to stay sharp, to live up to what you\'re capable of.',
   },
   provisions: {
-    heading: 'What resources protect you?',
-    subtext: 'Safety nets and support systems. Research on allostatic load (McEwen, 1998) shows adequate resources buffer against cumulative stress damage.',
+    heading: 'What do you have?',
+    subtext: 'Your resources and safety nets — savings, health, relationships, stability. Having things is better than not having them, but protecting what you have takes energy too.',
   },
   maps: {
     heading: 'What are you working toward?',
-    subtext: 'Goals and aspirations. Having direction and purpose is a proven protective factor against stress accumulation.',
+    subtext: 'Goals and ambitions. Direction gives meaning but also creates pressure — deadlines, expectations, the gap between where you are and where you want to be.',
   },
   souvenirs: {
-    heading: 'What gives your life meaning?',
-    subtext: 'Passions, values, relationships, and identity. The WHO\'s 2022 report identifies social connection and meaning as essential for mental health.',
+    heading: 'Who are you?',
+    subtext: 'The roles, values, and identity you carry. Being "the strong one," "the creative one," "a good parent" — these define you, and maintaining them takes real effort.',
   },
 };
 
@@ -154,24 +154,24 @@ export default function Onboarding() {
                 <div className="space-y-4">
                   <h1 className="text-3xl font-bold text-white">PackLight</h1>
                   <p className="text-lg text-slate-300 leading-relaxed">
-                    Identify what's draining you. Track it. Improve it.
+                    Everything you carry has weight — good and bad.
                   </p>
                   <div className="space-y-3 text-sm text-slate-400">
                     <div className="flex gap-3 items-start">
                       <span className="text-amber-400 font-mono text-lg leading-none">1</span>
-                      <p><span className="text-white">Name what you're carrying</span> — stress, obligations, skills, goals, and what gives you meaning.</p>
+                      <p><span className="text-white">Name what you're carrying</span> — stress and joy, obligations and ambitions, skills and the pressure to use them.</p>
                     </div>
                     <div className="flex gap-3 items-start">
                       <span className="text-amber-400 font-mono text-lg leading-none">2</span>
-                      <p><span className="text-white">Rate the weight and usefulness</span> of each item so you can see what's helping vs. hurting.</p>
+                      <p><span className="text-white">See the real weight</span> — a promotion, a new baby, a loving relationship all weigh something. Not just the bad stuff.</p>
                     </div>
                     <div className="flex gap-3 items-start">
                       <span className="text-amber-400 font-mono text-lg leading-none">3</span>
-                      <p><span className="text-white">Get a clearer picture</span> of your total load and take action — drop, reduce, or strengthen.</p>
+                      <p><span className="text-white">Carry what matters, lighter</span> — the goal isn't an empty pack. It's the right load, carried consciously.</p>
                     </div>
                   </div>
                   <p className="text-xs text-slate-600 pt-2">
-                    Based on research from the APA Stress in America Survey, Holmes-Rahe Stress Scale, and WHO mental health frameworks.
+                    Based on Holmes-Rahe (positive events are stressors too), allostatic load theory, and conservation of resources research.
                   </p>
                 </div>
                 <button
