@@ -4,6 +4,17 @@ export type TerrainType = 'uphill' | 'downhill' | 'swamp' | 'ridge' | 'camp' | '
 
 export type AgentId = 'geologist' | 'locksmith' | 'blacksmith' | 'quartermaster' | 'navigator' | 'archivist';
 
+export interface NextStep {
+  text: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface CompletedStep {
+  text: string;
+  completedAt: string;
+}
+
 export interface PackItem {
   id: string;
   name: string;
@@ -18,6 +29,9 @@ export interface PackItem {
   agentNotes: AgentNote[];
   weightHistory: { date: string; value: number }[];
   utilityHistory: { date: string; value: number }[];
+  lighteningApproach?: string;
+  nextStep?: NextStep;
+  completedSteps: CompletedStep[];
 }
 
 export interface AgentNote {
@@ -148,4 +162,51 @@ export const WEIGHT_LABELS: Record<number, string> = {
 export const UTILITY_LABELS: Record<number, string> = {
   1: 'Dead weight', 2: 'Marginal', 3: 'Minor', 4: 'Somewhat useful', 5: 'Useful',
   6: 'Valuable', 7: 'Important', 8: 'Very important', 9: 'Critical', 10: 'Essential',
+};
+
+export interface LighteningStrategy {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export const LIGHTENING_STRATEGIES: Record<Compartment, LighteningStrategy[]> = {
+  stones: [
+    { key: 'process', label: 'Process', description: 'Work through it over time — journaling, therapy, conversation' },
+    { key: 'reframe', label: 'Reframe', description: 'Change your relationship to it — perspective shift, cognitive reappraisal' },
+    { key: 'accept', label: 'Accept', description: 'Carry it intentionally — acknowledge without fighting it' },
+    { key: 'express', label: 'Express', description: 'Get it out — talk to someone, write it down, create something' },
+    { key: 'seek-help', label: 'Seek Help', description: 'This may need professional support — therapy, counseling, support group' },
+  ],
+  chains: [
+    { key: 'renegotiate', label: 'Renegotiate', description: 'Change the terms — reduce scope, adjust expectations, talk it out' },
+    { key: 'delegate', label: 'Delegate', description: 'Get someone else to carry part of it — ask for help, hire, trade' },
+    { key: 'automate', label: 'Automate', description: 'Remove the manual burden — systems, tools, routines' },
+    { key: 'set-boundary', label: 'Set Boundary', description: 'Draw a line — say no, limit time, protect your energy' },
+    { key: 'exit', label: 'Exit Plan', description: 'Create a path out — timeline, steps, transition plan' },
+  ],
+  tools: [
+    { key: 'practice', label: 'Practice', description: 'Use it or lose it — regular, deliberate practice' },
+    { key: 'learn', label: 'Learn', description: 'Fill the gap — course, book, tutorial, experimentation' },
+    { key: 'find-mentor', label: 'Find Mentor', description: 'Learn from someone ahead of you — mentor, peer, community' },
+    { key: 'retire', label: 'Retire', description: 'Let this skill go — it served you but is no longer needed' },
+  ],
+  provisions: [
+    { key: 'build-buffer', label: 'Build Buffer', description: 'Create margin — save more, stockpile, create reserves' },
+    { key: 'insure', label: 'Insure', description: 'Protect against loss — insurance, backup plans, redundancy' },
+    { key: 'expand-network', label: 'Expand Network', description: 'Strengthen your safety net — relationships, community, allies' },
+    { key: 'reduce-burn', label: 'Reduce Burn', description: 'Slow the drain — cut spending, reduce consumption, simplify' },
+  ],
+  maps: [
+    { key: 'decompose', label: 'Decompose', description: 'Break it into smaller steps — milestones, sub-goals, phases' },
+    { key: 'remove-blocker', label: 'Remove Blocker', description: 'Identify what\'s in the way and address it directly' },
+    { key: 'adjust-timeline', label: 'Adjust Timeline', description: 'Give yourself more time — realistic deadlines reduce weight' },
+    { key: 'pivot', label: 'Pivot', description: 'The goal needs updating — same direction, different path' },
+  ],
+  souvenirs: [
+    { key: 'protect-time', label: 'Protect Time', description: 'Schedule it — block time for what matters to you' },
+    { key: 'reconnect', label: 'Reconnect', description: 'You\'ve drifted — take one small step back toward it' },
+    { key: 'share', label: 'Share', description: 'Involve others — teach, invite, celebrate together' },
+    { key: 'release-nostalgia', label: 'Release', description: 'This was meaningful once but has become weight — honor it and let go' },
+  ],
 };

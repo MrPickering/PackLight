@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Feather } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
-import { AGENTS, TERRAIN_META, COMPARTMENT_META } from '../../types';
+import { AGENTS, TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { TerrainType, PackItem } from '../../types';
 import { calculatePaceScore } from '../../utils/paceScore';
 
@@ -23,10 +23,15 @@ export default function RepackMode() {
   const setTerrain = usePackStore(s => s.setTerrain);
   const updateItem = usePackStore(s => s.updateItem);
   const dropItem = usePackStore(s => s.dropItem);
+  const setLighteningApproach = usePackStore(s => s.setLighteningApproach);
+  const setNextStep = usePackStore(s => s.setNextStep);
+  const completeNextStep = usePackStore(s => s.completeNextStep);
 
   const [step, setStep] = useState<Step>('review');
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
-  const [triageActions, setTriageActions] = useState<Record<string, 'keep' | 'drop'>>({});
+  const [triageActions, setTriageActions] = useState<Record<string, 'keep' | 'drop' | 'lighten'>>({});
+  const [lightenExpanded, setLightenExpanded] = useState<string | null>(null);
+  const [triageNextStep, setTriageNextStep] = useState<Record<string, string>>({});
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -53,8 +58,13 @@ export default function RepackMode() {
 
   const initialScore = calculatePaceScore(items, profile.currentTerrain);
 
-  const handleTriage = (itemId: string, action: 'keep' | 'drop') => {
+  const handleTriage = (itemId: string, action: 'keep' | 'drop' | 'lighten') => {
     setTriageActions(prev => ({ ...prev, [itemId]: action }));
+    if (action === 'lighten') {
+      setLightenExpanded(itemId);
+    } else if (lightenExpanded === itemId) {
+      setLightenExpanded(null);
+    }
   };
 
   const applyTriage = () => {
@@ -197,6 +207,16 @@ export default function RepackMode() {
                         Keep
                       </button>
                       <button
+                        onClick={() => handleTriage(item.id, 'lighten')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                          triageActions[item.id] === 'lighten'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        <Feather size={10} /> Lighten
+                      </button>
+                      <button
                         onClick={() => handleTriage(item.id, 'drop')}
                         className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
                           triageActions[item.id] === 'drop'
@@ -207,6 +227,76 @@ export default function RepackMode() {
                         Drop
                       </button>
                     </div>
+
+                    {/* Inline lightening panel */}
+                    <AnimatePresence>
+                      {lightenExpanded === item.id && triageActions[item.id] === 'lighten' && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-3 space-y-2 pt-3 border-t border-slate-800">
+                            {!item.lighteningApproach ? (
+                              <>
+                                <p className="text-[10px] text-slate-500">Pick an approach:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {LIGHTENING_STRATEGIES[item.compartment].map(strategy => (
+                                    <button
+                                      key={strategy.key}
+                                      onClick={() => setLighteningApproach(item.id, strategy.key)}
+                                      className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-slate-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+                                      title={strategy.description}
+                                    >
+                                      {strategy.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded">
+                                    {LIGHTENING_STRATEGIES[item.compartment].find(s => s.key === item.lighteningApproach)?.label ?? item.lighteningApproach}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={triageNextStep[item.id] ?? ''}
+                                    onChange={e => setTriageNextStep(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                    placeholder="Next step this week..."
+                                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && triageNextStep[item.id]?.trim()) {
+                                        setNextStep(item.id, triageNextStep[item.id].trim());
+                                        setTriageNextStep(prev => ({ ...prev, [item.id]: '' }));
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (triageNextStep[item.id]?.trim()) {
+                                        setNextStep(item.id, triageNextStep[item.id].trim());
+                                        setTriageNextStep(prev => ({ ...prev, [item.id]: '' }));
+                                      }
+                                    }}
+                                    disabled={!triageNextStep[item.id]?.trim()}
+                                    className="px-2.5 py-1.5 bg-amber-500 text-slate-950 rounded-lg text-[11px] font-medium hover:bg-amber-400 transition-colors disabled:opacity-40"
+                                  >
+                                    Set
+                                  </button>
+                                </div>
+                                {item.nextStep && (
+                                  <p className="text-[11px] text-emerald-400">Next step set!</p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ))
               ) : (
@@ -269,8 +359,24 @@ export default function RepackMode() {
                   You let go of {Object.values(triageActions).filter(a => a === 'drop').length} item(s). That's lighter already.
                 </p>
               )}
+              {Object.values(triageActions).filter(a => a === 'lighten').length > 0 && (
+                <p className="text-amber-400 text-sm">
+                  You're actively lightening {Object.values(triageActions).filter(a => a === 'lighten').length} item(s). Small steps add up.
+                </p>
+              )}
+              {(() => {
+                const weekAgoDate = new Date();
+                weekAgoDate.setDate(weekAgoDate.getDate() - 7);
+                const stepsThisWeek = items.reduce((total, item) =>
+                  total + (item.completedSteps || []).filter(s => new Date(s.completedAt) >= weekAgoDate).length, 0);
+                return stepsThisWeek > 0 ? (
+                  <p className="text-violet-400 text-sm">
+                    {stepsThisWeek} lightening step{stepsThisWeek !== 1 ? 's' : ''} completed this week.
+                  </p>
+                ) : null;
+              })()}
               <p className="text-slate-500 text-sm max-w-md mx-auto">
-                Every repack is a chance to carry only what serves you. You're doing the work. Keep going.
+                Every repack is a chance to carry only what serves you. Not everything needs dropping — some things just need lightening. Keep going.
               </p>
               <Check size={32} className="text-amber-500 mx-auto" />
             </div>

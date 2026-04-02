@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Filter } from 'lucide-react';
+import { ArrowLeft, Plus, Filter, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { usePackStore } from '../../store';
-import { COMPARTMENT_META, AGENTS } from '../../types';
+import { COMPARTMENT_META, AGENTS, LIGHTENING_STRATEGIES } from '../../types';
 import type { Compartment, PackItem } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
 import AddItemModal from '../items/AddItemModal';
@@ -16,12 +16,17 @@ export default function CompartmentDetail() {
   const navigate = useNavigate();
   const items = usePackStore(s => s.items);
   const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
+  const setLighteningApproach = usePackStore(s => s.setLighteningApproach);
+  const setNextStep = usePackStore(s => s.setNextStep);
+  const completeNextStep = usePackStore(s => s.completeNextStep);
 
   const [sort, setSort] = useState<SortKey>('weight');
   const [deadWeightOnly, setDeadWeightOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<PackItem | null>(null);
+  const [nextStepInput, setNextStepInput] = useState<Record<string, string>>({});
+  const [showStepHistory, setShowStepHistory] = useState<string | null>(null);
 
   if (!compartment || !(compartment in COMPARTMENT_META)) {
     return <div className="text-slate-500">Compartment not found.</div>;
@@ -180,6 +185,124 @@ export default function CompartmentDetail() {
                             ))}
                           </div>
                         )}
+
+                        {/* Lighten This */}
+                        <div className="space-y-3 pt-2 border-t border-slate-800">
+                          <span className="text-[10px] text-amber-400 uppercase tracking-wider">Lighten This</span>
+
+                          {/* Strategy picker */}
+                          {!item.lighteningApproach ? (
+                            <div className="space-y-2">
+                              <p className="text-xs text-slate-500">How do you want to approach this?</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {LIGHTENING_STRATEGIES[item.compartment].map(strategy => (
+                                  <button
+                                    key={strategy.key}
+                                    onClick={() => setLighteningApproach(item.id, strategy.key)}
+                                    className="group relative px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+                                    title={strategy.description}
+                                  >
+                                    {strategy.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {/* Selected approach */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs bg-amber-500/15 text-amber-300 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                                  {LIGHTENING_STRATEGIES[item.compartment].find(s => s.key === item.lighteningApproach)?.label ?? item.lighteningApproach}
+                                </span>
+                                <span className="text-[10px] text-slate-600">
+                                  {LIGHTENING_STRATEGIES[item.compartment].find(s => s.key === item.lighteningApproach)?.description}
+                                </span>
+                                <button
+                                  onClick={() => setLighteningApproach(item.id, '')}
+                                  className="text-[10px] text-slate-600 hover:text-slate-400 ml-auto shrink-0"
+                                >
+                                  change
+                                </button>
+                              </div>
+
+                              {/* Current next step */}
+                              {item.nextStep && !item.nextStep.completedAt ? (
+                                <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-2.5">
+                                  <button
+                                    onClick={() => completeNextStep(item.id)}
+                                    className="shrink-0 w-5 h-5 rounded border border-slate-600 hover:border-emerald-400 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
+                                  >
+                                    <Check size={10} className="text-emerald-400 opacity-0 hover:opacity-100" />
+                                  </button>
+                                  <span className="text-sm text-slate-300">{item.nextStep.text}</span>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={nextStepInput[item.id] ?? ''}
+                                    onChange={e => setNextStepInput(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                    placeholder="What's one concrete thing you could do?"
+                                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && nextStepInput[item.id]?.trim()) {
+                                        setNextStep(item.id, nextStepInput[item.id].trim());
+                                        setNextStepInput(prev => ({ ...prev, [item.id]: '' }));
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (nextStepInput[item.id]?.trim()) {
+                                        setNextStep(item.id, nextStepInput[item.id].trim());
+                                        setNextStepInput(prev => ({ ...prev, [item.id]: '' }));
+                                      }
+                                    }}
+                                    disabled={!nextStepInput[item.id]?.trim()}
+                                    className="px-3 py-2 bg-amber-500 text-slate-950 rounded-lg text-xs font-medium hover:bg-amber-400 transition-colors disabled:opacity-40"
+                                  >
+                                    Set
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Completed steps */}
+                              {(item.completedSteps?.length ?? 0) > 0 && (
+                                <div>
+                                  <button
+                                    onClick={() => setShowStepHistory(showStepHistory === item.id ? null : item.id)}
+                                    className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300"
+                                  >
+                                    {item.completedSteps.length} step{item.completedSteps.length !== 1 ? 's' : ''} completed
+                                    {showStepHistory === item.id ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                                  </button>
+                                  <AnimatePresence>
+                                    {showStepHistory === item.id && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="overflow-hidden"
+                                      >
+                                        <div className="mt-2 space-y-1">
+                                          {item.completedSteps.map((step, i) => (
+                                            <div key={i} className="flex items-center gap-2 text-xs text-slate-500">
+                                              <Check size={10} className="text-emerald-500 shrink-0" />
+                                              <span className="line-through">{step.text}</span>
+                                              <span className="text-[10px] text-slate-700 ml-auto shrink-0">
+                                                {new Date(step.completedAt).toLocaleDateString()}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         <button
                           onClick={() => setEditItem(item)}

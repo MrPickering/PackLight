@@ -13,10 +13,15 @@ interface PackStore {
   lastDecayRun: string | null;
 
   // Item actions
-  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory'>) => void;
+  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps'>) => void;
   updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags'>>) => void;
   dropItem: (id: string) => void;
   restoreItem: (id: string) => void;
+
+  // Lightening actions
+  setLighteningApproach: (id: string, approach: string) => void;
+  setNextStep: (id: string, text: string) => void;
+  completeNextStep: (id: string) => void;
 
   // Agent notes
   addAgentNote: (note: AgentNote) => void;
@@ -65,6 +70,7 @@ export const usePackStore = create<PackStore>()(
           createdAt: now,
           updatedAt: now,
           agentNotes: [],
+          completedSteps: [],
           weightHistory: [{ date: now, value: itemData.weight }],
           utilityHistory: [{ date: now, value: itemData.utility }],
         };
@@ -103,6 +109,44 @@ export const usePackStore = create<PackStore>()(
           items: state.items.map(item =>
             item.id === id ? { ...item, droppedAt: undefined, updatedAt: now } : item,
           ),
+        }));
+      },
+
+      setLighteningApproach: (id, approach) => {
+        const now = new Date().toISOString();
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id ? { ...item, lighteningApproach: approach, updatedAt: now } : item,
+          ),
+        }));
+      },
+
+      setNextStep: (id, text) => {
+        const now = new Date().toISOString();
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id
+              ? { ...item, nextStep: { text, createdAt: now }, updatedAt: now }
+              : item,
+          ),
+        }));
+      },
+
+      completeNextStep: (id) => {
+        const now = new Date().toISOString();
+        set(state => ({
+          items: state.items.map(item => {
+            if (item.id !== id || !item.nextStep) return item;
+            return {
+              ...item,
+              completedSteps: [
+                ...(item.completedSteps || []),
+                { text: item.nextStep.text, completedAt: now },
+              ],
+              nextStep: undefined,
+              updatedAt: now,
+            };
+          }),
         }));
       },
 
