@@ -21,6 +21,9 @@ export default function SettingsPage() {
   const journal = usePackStore(s => s.journal);
   const agentNotes = usePackStore(s => s.agentNotes);
 
+  const onboardingAge = profile.onboardingCompletedAt
+    ? Math.floor((Date.now() - new Date(profile.onboardingCompletedAt).getTime()) / 86400000)
+    : 999;
   const [apiKey, setApiKey] = useState(localStorage.getItem('packlight-api-key') ?? '');
   const [showKey, setShowKey] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -101,6 +104,7 @@ export default function SettingsPage() {
         name: '', currentTerrain: 'camp', terrainSetAt: new Date().toISOString(),
         paceScoreHistory: [], recoveryHistory: [], loadBalanceHistory: [],
         displayMode: 'default', contexts: DEFAULT_CONTEXTS, activeContext: null,
+        firstStepsComplete: false, firstStepsStep: 0, onboardingCompletedAt: '', dismissedPrompts: [],
       },
       onboardingComplete: false,
       lastDecayRun: null,
@@ -149,8 +153,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Display Mode */}
-      <section className="space-y-4">
+      {/* Display Mode — shown after 3+ days */}
+      {onboardingAge >= 3 && <section className="space-y-4">
         <h2 className="text-sm font-medium text-slate-400">Display Mode</h2>
         <p className="text-xs text-slate-600">Different brains process load differently. Choose what works for you.</p>
         <div className="space-y-2">
@@ -169,7 +173,7 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-      </section>
+      </section>}
 
       {/* API Key */}
       <section className="space-y-4">

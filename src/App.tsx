@@ -10,7 +10,13 @@ import TrailMap from './components/trail/TrailMap';
 import RepackMode from './components/repack/RepackMode';
 import SettingsPage from './components/settings/SettingsPage';
 import Onboarding from './components/onboarding/Onboarding';
+import FirstSteps from './components/onboarding/FirstSteps';
 import DisplayModeProvider from './components/shared/DisplayModeProvider';
+
+function HomeRoute() {
+  const firstStepsComplete = usePackStore(s => s.profile.firstStepsComplete);
+  return firstStepsComplete ? <PackView /> : <FirstSteps />;
+}
 
 export default function App() {
   const onboardingComplete = usePackStore(s => s.onboardingComplete);
@@ -45,7 +51,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<PackView />} />
+            <Route path="/" element={<HomeRoute />} />
             <Route path="/pack/:compartment" element={<CompartmentDetail />} />
             <Route path="/journal" element={<JournalPage />} />
             <Route path="/agents" element={<AgentFeed />} />

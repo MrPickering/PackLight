@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext } from '../types';
+import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext, FirstStepsStep } from '../types';
 import { DEFAULT_CONTEXTS } from '../types';
 import { calculatePaceScore } from '../utils/paceScore';
 import { calculateLoadBalance } from '../utils/loadBalance';
@@ -47,6 +47,13 @@ interface PackStore {
   // Recovery
   addRecoveryCheck: (check: Omit<RecoveryCheck, 'id'>) => void;
 
+  // First Steps
+  advanceFirstStep: () => void;
+  completeFirstSteps: () => void;
+
+  // Guided Prompts
+  dismissPrompt: (dismissKey: string) => void;
+
   // Context & Display
   setActiveContext: (contextId: string | null) => void;
   setDisplayMode: (mode: DisplayMode) => void;
@@ -92,6 +99,10 @@ export const usePackStore = create<PackStore>()(
         displayMode: 'default' as DisplayMode,
         contexts: DEFAULT_CONTEXTS,
         activeContext: null,
+        firstStepsComplete: false,
+        firstStepsStep: 0 as FirstStepsStep,
+        onboardingCompletedAt: '',
+        dismissedPrompts: [],
       },
       onboardingComplete: false,
       lastDecayRun: null,
@@ -326,7 +337,10 @@ export const usePackStore = create<PackStore>()(
       },
 
       completeOnboarding: () => {
-        set({ onboardingComplete: true });
+        set(state => ({
+          onboardingComplete: true,
+          profile: { ...state.profile, onboardingCompletedAt: new Date().toISOString() },
+        }));
       },
 
       addRecoveryCheck: (check) => {
@@ -335,6 +349,32 @@ export const usePackStore = create<PackStore>()(
           profile: {
             ...state.profile,
             recoveryHistory: [...state.profile.recoveryHistory, recovery],
+          },
+        }));
+      },
+
+      // ── First Steps & Guided Prompts ──
+
+      advanceFirstStep: () => {
+        set(state => ({
+          profile: {
+            ...state.profile,
+            firstStepsStep: Math.min(4, state.profile.firstStepsStep + 1) as FirstStepsStep,
+          },
+        }));
+      },
+
+      completeFirstSteps: () => {
+        set(state => ({
+          profile: { ...state.profile, firstStepsComplete: true, firstStepsStep: 4 as FirstStepsStep },
+        }));
+      },
+
+      dismissPrompt: (dismissKey) => {
+        set(state => ({
+          profile: {
+            ...state.profile,
+            dismissedPrompts: [...state.profile.dismissedPrompts, dismissKey],
           },
         }));
       },
@@ -492,7 +532,7 @@ export const usePackStore = create<PackStore>()(
     }),
     {
       name: 'packlight-store',
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -524,6 +564,15 @@ export const usePackStore = create<PackStore>()(
             ...item,
             contexts: (item as Record<string, unknown>).contexts ?? [],
           }));
+        }
+        if (version < 5) {
+          const profile = state.profile as Record<string, unknown>;
+          if (profile) {
+            profile.firstStepsComplete = profile.firstStepsComplete ?? true;
+            profile.firstStepsStep = profile.firstStepsStep ?? 4;
+            profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? (profile.terrainSetAt as string) ?? new Date().toISOString();
+            profile.dismissedPrompts = profile.dismissedPrompts ?? [];
+          }
         }
         return state;
       },

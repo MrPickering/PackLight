@@ -8,7 +8,9 @@ interface DisplayModeConfig {
   showDimensions: boolean;
   showTotals: boolean;
   showStrainWarnings: boolean;
+  showPrompts: boolean;
   maxVisibleItems: number | null;
+  maxPrompts: number;
   framingStyle: 'neutral' | 'progress' | 'minimal';
 }
 
@@ -18,7 +20,9 @@ const MODE_CONFIGS: Record<DisplayMode, Omit<DisplayModeConfig, 'mode'>> = {
     showDimensions: true,
     showTotals: true,
     showStrainWarnings: true,
+    showPrompts: true,
     maxVisibleItems: null,
+    maxPrompts: 2,
     framingStyle: 'neutral',
   },
   focused: {
@@ -26,7 +30,9 @@ const MODE_CONFIGS: Record<DisplayMode, Omit<DisplayModeConfig, 'mode'>> = {
     showDimensions: false,
     showTotals: false,
     showStrainWarnings: false,
+    showPrompts: false,
     maxVisibleItems: 3,
+    maxPrompts: 0,
     framingStyle: 'minimal',
   },
   structured: {
@@ -34,7 +40,9 @@ const MODE_CONFIGS: Record<DisplayMode, Omit<DisplayModeConfig, 'mode'>> = {
     showDimensions: true,
     showTotals: true,
     showStrainWarnings: true,
+    showPrompts: true,
     maxVisibleItems: null,
+    maxPrompts: 2,
     framingStyle: 'neutral',
   },
   'low-energy': {
@@ -42,7 +50,9 @@ const MODE_CONFIGS: Record<DisplayMode, Omit<DisplayModeConfig, 'mode'>> = {
     showDimensions: false,
     showTotals: true,
     showStrainWarnings: false,
+    showPrompts: true,
     maxVisibleItems: 5,
+    maxPrompts: 1,
     framingStyle: 'minimal',
   },
   gentle: {
@@ -50,13 +60,15 @@ const MODE_CONFIGS: Record<DisplayMode, Omit<DisplayModeConfig, 'mode'>> = {
     showDimensions: true,
     showTotals: false,
     showStrainWarnings: false,
+    showPrompts: true,
     maxVisibleItems: null,
+    maxPrompts: 2,
     framingStyle: 'progress',
   },
 };
 
 const DisplayModeContext = createContext<DisplayModeConfig>({
-  mode: 'default',
+  mode: 'default' as DisplayMode,
   ...MODE_CONFIGS.default,
 });
 

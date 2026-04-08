@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, Filter, Check, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
@@ -15,6 +15,8 @@ type SortKey = 'weight' | 'utility' | 'delta' | 'updated';
 export default function CompartmentDetail() {
   const { compartment } = useParams<{ compartment: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightItemId = (location.state as { highlightItemId?: string })?.highlightItemId;
   const items = usePackStore(s => s.items);
   const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
   const getChildItems = usePackStore(s => s.getChildItems);
@@ -29,7 +31,7 @@ export default function CompartmentDetail() {
 
   const [sort, setSort] = useState<SortKey>('weight');
   const [deadWeightOnly, setDeadWeightOnly] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(highlightItemId ?? null);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [addParent, setAddParent] = useState<{ id: string; name: string } | null>(null);

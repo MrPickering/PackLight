@@ -21,6 +21,23 @@ export const DEFAULT_CONTEXTS: LifeContext[] = [
   { id: 'health', name: 'Health', emoji: '💪', color: 'rose' },
 ];
 
+export type GuidedPromptType = 'item' | 'pattern' | 'milestone';
+export type FirstStepsStep = 0 | 1 | 2 | 3 | 4;
+
+export interface GuidedPrompt {
+  id: string;
+  type: GuidedPromptType;
+  priority: number;
+  message: string;
+  action?: {
+    label: string;
+    route?: string;
+    itemId?: string;
+    actionType?: 'navigate' | 'openItem' | 'recoveryCheckIn';
+  };
+  dismissKey: string;
+}
+
 export interface NextStep {
   text: string;
   createdAt: string;
@@ -131,6 +148,10 @@ export interface UserProfile {
   displayMode: DisplayMode;
   contexts: LifeContext[];
   activeContext: string | null;
+  firstStepsComplete: boolean;
+  firstStepsStep: FirstStepsStep;
+  onboardingCompletedAt: string;
+  dismissedPrompts: string[];
 }
 
 export const COMPARTMENT_META: Record<Compartment, { label: string; emoji: string; color: string }> = {

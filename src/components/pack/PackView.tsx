@@ -8,7 +8,9 @@ import WeightUtilityBar from '../shared/WeightUtilityBar';
 import RecoveryCheckIn from '../shared/RecoveryCheckIn';
 import ContextSwitcher from '../shared/ContextSwitcher';
 import { useDisplayMode } from '../shared/DisplayModeProvider';
-import { useState } from 'react';
+import GuidedPromptCard from '../shared/GuidedPromptCard';
+import { generateGuidedPrompts } from '../../utils/guidedPrompts';
+import { useState, useMemo } from 'react';
 import AddItemModal from '../items/AddItemModal';
 
 const COMPARTMENTS: Compartment[] = ['stones', 'chains', 'tools', 'provisions', 'maps', 'souvenirs'];
@@ -50,7 +52,8 @@ export default function PackView() {
   const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
   const getContextItems = usePackStore(s => s.getContextItems);
   const agentNotes = usePackStore(s => s.agentNotes);
-  const activeContext = usePackStore(s => s.profile.activeContext);
+  const allItems = usePackStore(s => s.items);
+  const dismissPrompt = usePackStore(s => s.dismissPrompt);
   const displayConfig = useDisplayMode();
   const [showAdd, setShowAdd] = useState(false);
 
@@ -60,6 +63,15 @@ export default function PackView() {
   const getChildItems = usePackStore(s => s.getChildItems);
   const terrain = TERRAIN_META[profile.currentTerrain];
   const recentNotes = agentNotes.filter(n => n.status === 'pending').slice(0, 3);
+
+  // Guided prompts
+  const prompts = useMemo(() => generateGuidedPrompts({
+    items: allItems, profile, loadBalanceScore: balance.score, framingStyle: displayConfig.framingStyle,
+  }), [allItems, profile, balance.score, displayConfig.framingStyle]);
+  const visiblePrompts = displayConfig.showPrompts ? prompts.slice(0, displayConfig.maxPrompts) : [];
+
+  // Feature gating
+  const onboardingAge = profile.onboardingCompletedAt ? Math.floor((Date.now() - new Date(profile.onboardingCompletedAt).getTime()) / 86400000) : 999;
 
   // Context-filtered items
   const contextItems = getContextItems();
@@ -122,8 +134,33 @@ export default function PackView() {
         </div>
       </div>
 
-      {/* Context switcher */}
-      <ContextSwitcher />
+      {/* Context switcher — show after items exist in 2+ contexts */}
+      {(() => {
+        const uniqueCtx = new Set(contextItems.flatMap(i => i.contexts));
+        return uniqueCtx.size >= 2 ? <ContextSwitcher /> : null;
+      })()}
+
+      {/* Guided prompts */}
+      {visiblePrompts.length > 0 && (
+        <div className="space-y-2">
+          <AnimatePresence>
+            {visiblePrompts.map(prompt => (
+              <GuidedPromptCard
+                key={prompt.id}
+                prompt={prompt}
+                onDismiss={dismissPrompt}
+                onAction={(p) => {
+                  if (p.action?.route) {
+                    navigate(p.action.route, {
+                      state: p.action.itemId ? { highlightItemId: p.action.itemId } : undefined,
+                    });
+                  }
+                }}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Recovery check-in */}
       <RecoveryCheckIn />
@@ -202,12 +239,14 @@ export default function PackView() {
         >
           <BookOpen size={16} /> Journal
         </button>
-        <button
-          onClick={() => navigate('/repack')}
-          className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm hover:bg-slate-700 transition-colors"
-        >
-          <RefreshCw size={16} /> Weekly Repack
-        </button>
+        {onboardingAge >= 7 && (
+          <button
+            onClick={() => navigate('/repack')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm hover:bg-slate-700 transition-colors"
+          >
+            <RefreshCw size={16} /> Weekly Repack
+          </button>
+        )}
       </div>
 
       {/* Compartment grid */}
