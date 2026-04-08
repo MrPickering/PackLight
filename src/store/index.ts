@@ -5,6 +5,11 @@ import { calculatePaceScore } from '../utils/paceScore';
 import { calculateLoadBalance } from '../utils/loadBalance';
 import { runWeightDecay } from '../utils/weightDecay';
 
+function dimensionsToWeight(d: PackItem['weightDimensions']): number {
+  if (!d) return 0;
+  return Math.round((d.stress + d.worry + d.cognitive + d.urgency + d.emotional) / 2.5);
+}
+
 interface PackStore {
   items: PackItem[];
   agentNotes: AgentNote[];
@@ -14,10 +19,11 @@ interface PackStore {
   lastDecayRun: string | null;
 
   // Item actions
-  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps'>) => void;
-  updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags'>>) => void;
-  dropItem: (id: string, releaseNote?: string) => void;
+  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps' | 'parentId' | 'isContainer' | 'originalWeight' | 'originalUtility'> & { parentId?: string | null }) => void;
+  updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags' | 'weightDimensions'>>) => void;
+  dropItem: (id: string, releaseNote?: string, cascade?: boolean) => void;
   restoreItem: (id: string) => void;
+  markAsContainer: (id: string) => void;
 
   // Lightening actions
   setLighteningApproach: (id: string, approach: string) => void;
@@ -39,6 +45,16 @@ interface PackStore {
 
   // Recovery
   addRecoveryCheck: (check: Omit<RecoveryCheck, 'id'>) => void;
+
+  // Hierarchy helpers
+  getChildItems: (parentId: string) => PackItem[];
+  getRootItems: () => PackItem[];
+  getEffectiveWeight: (itemId: string) => number;
+  getEffectiveUtility: (itemId: string) => number;
+  getItemDepth: (itemId: string) => number;
+  getItemAncestors: (itemId: string) => PackItem[];
+  getDescendants: (itemId: string) => PackItem[];
+  getLeafItems: () => PackItem[];
 
   // Computed
   getPaceScore: () => number;
@@ -71,17 +87,44 @@ export const usePackStore = create<PackStore>()(
 
       addItem: (itemData) => {
         const now = new Date().toISOString();
+        const parentId = itemData.parentId ?? null;
+
+        // Enforce depth limit of 3
+        if (parentId) {
+          const depth = get().getItemDepth(parentId);
+          if (depth >= 2) return; // parent is already at max depth
+        }
+
+        const weight = itemData.weightDimensions
+          ? dimensionsToWeight(itemData.weightDimensions)
+          : itemData.weight;
+
         const item: PackItem = {
           ...itemData,
+          parentId,
           id: crypto.randomUUID(),
           createdAt: now,
           updatedAt: now,
           agentNotes: [],
           completedSteps: [],
-          weightHistory: [{ date: now, value: itemData.weight }],
+          isContainer: false,
+          originalWeight: weight,
+          originalUtility: itemData.utility,
+          weight,
+          weightHistory: [{ date: now, value: weight }],
           utilityHistory: [{ date: now, value: itemData.utility }],
         };
-        set(state => ({ items: [...state.items, item] }));
+
+        set(state => {
+          let items = [...state.items, item];
+          // Mark parent as container
+          if (parentId) {
+            items = items.map(i =>
+              i.id === parentId ? { ...i, isContainer: true, updatedAt: now } : i,
+            );
+          }
+          return { items };
+        });
       },
 
       updateItem: (id, updates) => {
@@ -89,9 +132,21 @@ export const usePackStore = create<PackStore>()(
         set(state => ({
           items: state.items.map(item => {
             if (item.id !== id) return item;
-            const updated = { ...item, ...updates, updatedAt: now };
-            if (updates.weight !== undefined && updates.weight !== item.weight) {
-              updated.weightHistory = [...item.weightHistory, { date: now, value: updates.weight }];
+
+            let newWeight = updates.weight;
+            if (updates.weightDimensions) {
+              newWeight = dimensionsToWeight(updates.weightDimensions);
+            }
+
+            const updated = {
+              ...item,
+              ...updates,
+              ...(newWeight !== undefined ? { weight: newWeight } : {}),
+              updatedAt: now,
+            };
+
+            if (newWeight !== undefined && newWeight !== item.weight) {
+              updated.weightHistory = [...item.weightHistory, { date: now, value: newWeight }];
             }
             if (updates.utility !== undefined && updates.utility !== item.utility) {
               updated.utilityHistory = [...item.utilityHistory, { date: now, value: updates.utility }];
@@ -99,24 +154,53 @@ export const usePackStore = create<PackStore>()(
             return updated;
           }),
         }));
+
+        // Touch parent's updatedAt
+        const item = get().items.find(i => i.id === id);
+        if (item?.parentId) {
+          set(state => ({
+            items: state.items.map(i =>
+              i.id === item.parentId ? { ...i, updatedAt: now } : i,
+            ),
+          }));
+        }
       },
 
-      dropItem: (id, releaseNote) => {
+      dropItem: (id, releaseNote, cascade = true) => {
         const now = new Date().toISOString();
+        const descendants = cascade ? get().getDescendants(id) : [];
+        const dropIds = new Set([id, ...descendants.map(d => d.id)]);
+
         set(state => ({
-          items: state.items.map(item =>
-            item.id === id
-              ? { ...item, droppedAt: now, updatedAt: now, ...(releaseNote ? { releaseNote } : {}) }
-              : item,
-          ),
+          items: state.items.map(item => {
+            if (dropIds.has(item.id)) {
+              return { ...item, droppedAt: now, updatedAt: now, ...(item.id === id && releaseNote ? { releaseNote } : {}) };
+            }
+            // If not cascading, orphan children to root
+            if (!cascade && item.parentId === id) {
+              return { ...item, parentId: null, updatedAt: now };
+            }
+            return item;
+          }),
         }));
       },
 
       restoreItem: (id) => {
         const now = new Date().toISOString();
+        const descendants = get().getDescendants(id);
+        const restoreIds = new Set([id, ...descendants.map(d => d.id)]);
+
         set(state => ({
           items: state.items.map(item =>
-            item.id === id ? { ...item, droppedAt: undefined, updatedAt: now } : item,
+            restoreIds.has(item.id) ? { ...item, droppedAt: undefined, updatedAt: now } : item,
+          ),
+        }));
+      },
+
+      markAsContainer: (id) => {
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id ? { ...item, isContainer: true } : item,
           ),
         }));
       },
@@ -243,6 +327,79 @@ export const usePackStore = create<PackStore>()(
         }));
       },
 
+      // ── Hierarchy helpers ──
+
+      getChildItems: (parentId) =>
+        get().items.filter(i => i.parentId === parentId && !i.droppedAt)
+          .sort((a, b) => b.weight - a.weight),
+
+      getRootItems: () =>
+        get().items.filter(i => i.parentId === null && !i.droppedAt),
+
+      getEffectiveWeight: (itemId) => {
+        const state = get();
+        const children = state.items.filter(i => i.parentId === itemId && !i.droppedAt);
+        if (children.length === 0) {
+          const item = state.items.find(i => i.id === itemId);
+          return item?.weight ?? 0;
+        }
+        return children.reduce((sum, child) => sum + state.getEffectiveWeight(child.id), 0);
+      },
+
+      getEffectiveUtility: (itemId) => {
+        const state = get();
+        const children = state.items.filter(i => i.parentId === itemId && !i.droppedAt);
+        if (children.length === 0) {
+          const item = state.items.find(i => i.id === itemId);
+          return item?.utility ?? 0;
+        }
+        return children.reduce((sum, child) => sum + state.getEffectiveUtility(child.id), 0);
+      },
+
+      getItemDepth: (itemId) => {
+        const items = get().items;
+        let depth = 0;
+        let current = items.find(i => i.id === itemId);
+        while (current?.parentId) {
+          depth++;
+          current = items.find(i => i.id === current!.parentId);
+        }
+        return depth;
+      },
+
+      getItemAncestors: (itemId) => {
+        const items = get().items;
+        const ancestors: PackItem[] = [];
+        let current = items.find(i => i.id === itemId);
+        while (current?.parentId) {
+          const parent = items.find(i => i.id === current!.parentId);
+          if (parent) ancestors.push(parent);
+          current = parent;
+        }
+        return ancestors;
+      },
+
+      getDescendants: (itemId) => {
+        const items = get().items;
+        const result: PackItem[] = [];
+        const queue = [itemId];
+        while (queue.length > 0) {
+          const pid = queue.shift()!;
+          const children = items.filter(i => i.parentId === pid);
+          result.push(...children);
+          queue.push(...children.map(c => c.id));
+        }
+        return result;
+      },
+
+      getLeafItems: () => {
+        const items = get().items.filter(i => !i.droppedAt);
+        const parentIds = new Set(items.map(i => i.parentId).filter(Boolean));
+        return items.filter(i => !parentIds.has(i.id));
+      },
+
+      // ── Computed ──
+
       getPaceScore: () => {
         const { items, profile } = get();
         return calculatePaceScore(items, profile.currentTerrain);
@@ -261,11 +418,14 @@ export const usePackStore = create<PackStore>()(
         get().items.filter(i => i.compartment === compartment && !i.droppedAt),
 
       getCompartmentStats: (compartment) => {
-        const items = get().items.filter(i => i.compartment === compartment && !i.droppedAt);
+        // Use leaf items only to avoid double-counting
+        const allActive = get().items.filter(i => !i.droppedAt);
+        const parentIds = new Set(allActive.filter(i => i.parentId).map(i => i.parentId));
+        const leafItems = allActive.filter(i => i.compartment === compartment && !parentIds.has(i.id));
         return {
-          count: items.length,
-          totalWeight: items.reduce((s, i) => s + i.weight, 0),
-          totalUtility: items.reduce((s, i) => s + i.utility, 0),
+          count: allActive.filter(i => i.compartment === compartment).length,
+          totalWeight: leafItems.reduce((s, i) => s + i.weight, 0),
+          totalUtility: leafItems.reduce((s, i) => s + i.utility, 0),
         };
       },
 
@@ -286,7 +446,7 @@ export const usePackStore = create<PackStore>()(
     }),
     {
       name: 'packlight-store',
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -295,6 +455,16 @@ export const usePackStore = create<PackStore>()(
             profile.recoveryHistory = profile.recoveryHistory ?? [];
             profile.loadBalanceHistory = profile.loadBalanceHistory ?? [];
           }
+        }
+        if (version < 3) {
+          const items = (state.items ?? []) as Record<string, unknown>[];
+          state.items = items.map(item => ({
+            ...item,
+            parentId: item.parentId ?? null,
+            isContainer: item.isContainer ?? false,
+            originalWeight: item.originalWeight ?? item.weight,
+            originalUtility: item.originalUtility ?? item.utility,
+          }));
         }
         return state;
       },

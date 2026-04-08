@@ -21,7 +21,7 @@ export function runWeightDecay(items: PackItem[]): { updatedItems: PackItem[]; n
   const allNotes: AgentNote[] = [];
 
   const updatedItems = items.map(item => {
-    if (item.droppedAt) return item;
+    if (item.droppedAt || item.isContainer) return item;
     const days = daysSince(item.updatedAt);
     const copy = { ...item };
 

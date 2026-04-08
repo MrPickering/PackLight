@@ -50,8 +50,11 @@ export function calculateLoadBalance(
   recoveryHistory: RecoveryCheck[],
 ): { score: number; recovery: number; strain: number } {
   const activeItems = items.filter(i => !i.droppedAt);
-  const totalWeight = activeItems.reduce((sum, i) => sum + i.weight, 0);
-  const totalUtility = activeItems.reduce((sum, i) => sum + i.utility, 0);
+  // Use leaf items only to avoid double-counting parents and children
+  const activeIds = new Set(activeItems.filter(i => i.parentId).map(i => i.parentId));
+  const leafItems = activeItems.filter(i => !activeIds.has(i.id));
+  const totalWeight = leafItems.reduce((sum, i) => sum + i.weight, 0);
+  const totalUtility = leafItems.reduce((sum, i) => sum + i.utility, 0);
 
   const recovery = recoveryScore(recoveryHistory);
   const strain = calculateStrain(recoveryHistory);

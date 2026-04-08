@@ -52,21 +52,29 @@ export default function PackView() {
   const [showAdd, setShowAdd] = useState(false);
 
   const balance = getLoadBalance();
+  const getLeafItems = usePackStore(s => s.getLeafItems);
+  const getEffectiveWeight = usePackStore(s => s.getEffectiveWeight);
+  const getEffectiveUtility = usePackStore(s => s.getEffectiveUtility);
+  const getRootItems = usePackStore(s => s.getRootItems);
   const terrain = TERRAIN_META[profile.currentTerrain];
   const recentNotes = agentNotes.filter(n => n.status === 'pending').slice(0, 3);
   const activeItems = getActiveItems();
+  const leafItems = getLeafItems();
+  const rootItems = getRootItems();
 
-  const totalWeight = activeItems.reduce((s, i) => s + i.weight, 0);
-  const totalUtility = activeItems.reduce((s, i) => s + i.utility, 0);
+  const totalWeight = leafItems.reduce((s, i) => s + i.weight, 0);
+  const totalUtility = leafItems.reduce((s, i) => s + i.utility, 0);
 
   const prevScore = profile.loadBalanceHistory.length > 1
     ? profile.loadBalanceHistory[profile.loadBalanceHistory.length - 2]?.value
     : null;
   const trend = prevScore !== null ? balance.score - prevScore : 0;
 
-  // Find heaviest burdens and strongest assets for the summary
-  const heaviest = [...activeItems].filter(i => i.weight > i.utility).sort((a, b) => (b.weight - b.utility) - (a.weight - a.utility)).slice(0, 3);
-  const strongest = [...activeItems].filter(i => i.utility > i.weight).sort((a, b) => (b.utility - b.weight) - (a.utility - a.weight)).slice(0, 3);
+  // Find heaviest burdens and strongest assets using effective weights on root items
+  const heaviest = [...rootItems].filter(i => getEffectiveWeight(i.id) > getEffectiveUtility(i.id))
+    .sort((a, b) => (getEffectiveWeight(b.id) - getEffectiveUtility(b.id)) - (getEffectiveWeight(a.id) - getEffectiveUtility(a.id))).slice(0, 3);
+  const strongest = [...rootItems].filter(i => getEffectiveUtility(i.id) > getEffectiveWeight(i.id))
+    .sort((a, b) => (getEffectiveUtility(b.id) - getEffectiveWeight(b.id)) - (getEffectiveUtility(a.id) - getEffectiveWeight(a.id))).slice(0, 3);
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
@@ -128,7 +136,7 @@ export default function PackView() {
                   {heaviest.map(item => (
                     <div key={item.id} className="text-xs text-slate-400 flex justify-between">
                       <span className="truncate">{item.name}</span>
-                      <span className="text-rose-400 font-mono ml-2 shrink-0">+{item.weight - item.utility}</span>
+                      <span className="text-rose-400 font-mono ml-2 shrink-0">+{getEffectiveWeight(item.id) - getEffectiveUtility(item.id)}</span>
                     </div>
                   ))}
                 </div>
@@ -141,7 +149,7 @@ export default function PackView() {
                   {strongest.map(item => (
                     <div key={item.id} className="text-xs text-slate-400 flex justify-between">
                       <span className="truncate">{item.name}</span>
-                      <span className="text-emerald-400 font-mono ml-2 shrink-0">+{item.utility - item.weight}</span>
+                      <span className="text-emerald-400 font-mono ml-2 shrink-0">+{getEffectiveUtility(item.id) - getEffectiveWeight(item.id)}</span>
                     </div>
                   ))}
                 </div>

@@ -15,6 +15,22 @@ export interface CompletedStep {
   completedAt: string;
 }
 
+export interface WeightDimensions {
+  stress: number;       // 1-5: tension, pressure
+  worry: number;        // 1-5: anxiety, uncertainty, anticipation
+  cognitive: number;    // 1-5: mental load, headspace, complexity
+  urgency: number;      // 1-5: time pressure, deadlines
+  emotional: number;    // 1-5: emotional charge (positive or negative)
+}
+
+export const DIMENSION_LABELS: Record<keyof WeightDimensions, { label: string; description: string }> = {
+  stress: { label: 'Stress', description: 'How much tension or pressure?' },
+  worry: { label: 'Worry', description: 'How anxious or uncertain?' },
+  cognitive: { label: 'Mental load', description: 'How much headspace does it take?' },
+  urgency: { label: 'Urgency', description: 'How time-pressured?' },
+  emotional: { label: 'Emotional charge', description: 'How strongly do you feel about it?' },
+};
+
 export interface PackItem {
   id: string;
   name: string;
@@ -33,6 +49,13 @@ export interface PackItem {
   lighteningApproach?: string;
   nextStep?: NextStep;
   completedSteps: CompletedStep[];
+  parentId: string | null;
+  isContainer: boolean;
+  originalWeight: number;
+  originalUtility: number;
+  weightDimensions?: WeightDimensions;
+  metadata?: Record<string, unknown>;
+  sourceRef?: string;
 }
 
 export interface AgentNote {
