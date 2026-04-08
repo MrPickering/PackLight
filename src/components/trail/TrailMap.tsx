@@ -6,6 +6,7 @@ import { usePackStore } from '../../store';
 import { TERRAIN_META, COMPARTMENT_META } from '../../types';
 import type { TerrainType } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
+import { useDisplayMode } from '../shared/DisplayModeProvider';
 
 const TERRAINS: TerrainType[] = ['summit', 'downhill', 'camp', 'uphill', 'ridge', 'swamp'];
 const RANGE_OPTIONS = [
@@ -19,6 +20,7 @@ export default function TrailMap() {
   const setTerrain = usePackStore(s => s.setTerrain);
   const items = usePackStore(s => s.items);
   const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
+  const displayConfig = useDisplayMode();
   const [range, setRange] = useState(30);
 
   const maps = getCompartmentItems('maps');
@@ -129,7 +131,7 @@ export default function TrailMap() {
       {balanceHistory.length > 1 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-400">Load Balance Trend</h2>
+            <h2 className="text-sm font-medium text-slate-400">{displayConfig.framingStyle === 'progress' ? 'Progress Trend' : 'Load Balance Trend'}</h2>
             <div className="flex gap-1">
               {RANGE_OPTIONS.map(opt => (
                 <button
@@ -164,7 +166,7 @@ export default function TrailMap() {
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-slate-400 flex items-center gap-2">
           <TrendingDown size={14} /> Released
-          {totalDroppedWeight > 0 && (
+          {displayConfig.showTotals && totalDroppedWeight > 0 && (
             <span className="font-mono text-emerald-400 text-xs">-{totalDroppedWeight} total weight</span>
           )}
         </h2>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePackStore } from '../../store';
+import { useDisplayMode } from './DisplayModeProvider';
 
 const DIMENSIONS = [
   { key: 'sleep', label: 'Sleep' },
@@ -14,6 +15,7 @@ const DIMENSIONS = [
 export default function RecoveryCheckIn() {
   const addRecoveryCheck = usePackStore(s => s.addRecoveryCheck);
   const recoveryHistory = usePackStore(s => s.profile.recoveryHistory);
+  const displayConfig = useDisplayMode();
 
   const [dismissed, setDismissed] = useState(false);
   const [scores, setScores] = useState<Record<string, number>>({
@@ -21,11 +23,11 @@ export default function RecoveryCheckIn() {
   });
   const [saved, setSaved] = useState(false);
 
-  // Don't show if already checked in today
+  // Don't show if already checked in today or in minimal display modes
   const today = new Date().toISOString().split('T')[0];
   const checkedInToday = recoveryHistory.some(c => c.date.split('T')[0] === today);
 
-  if (dismissed || checkedInToday || saved) return null;
+  if (dismissed || checkedInToday || saved || displayConfig.framingStyle === 'minimal') return null;
 
   const handleSave = () => {
     addRecoveryCheck({

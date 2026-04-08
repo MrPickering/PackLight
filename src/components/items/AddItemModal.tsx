@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, WEIGHT_LABELS, UTILITY_LABELS, DIMENSION_LABELS } from '../../types';
-import type { Compartment, PackItem, WeightDimensions } from '../../types';
+import type { Compartment, PackItem, WeightDimensions, LifeContext } from '../../types';
 import Slider from '../shared/Slider';
 import ReleaseRitualModal from './ReleaseRitualModal';
 
@@ -21,6 +21,7 @@ const DIMENSION_KEYS: (keyof WeightDimensions)[] = ['stress', 'worry', 'cognitiv
 export default function AddItemModal({ onClose, editItem, defaultCompartment, parentId, parentName }: Props) {
   const addItem = usePackStore(s => s.addItem);
   const updateItem = usePackStore(s => s.updateItem);
+  const availableContexts = usePackStore(s => s.profile.contexts);
 
   const isSubItem = !!parentId;
 
@@ -30,6 +31,7 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
   const [utility, setUtility] = useState(editItem?.utility ?? 5);
   const [description, setDescription] = useState(editItem?.description ?? '');
   const [tags, setTags] = useState(editItem?.tags.join(', ') ?? '');
+  const [selectedContexts, setSelectedContexts] = useState<string[]>(editItem?.contexts ?? []);
   const [showReleaseRitual, setShowReleaseRitual] = useState(false);
   const [showCompartmentOverride, setShowCompartmentOverride] = useState(false);
 
@@ -42,6 +44,12 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
     (dimensions.stress + dimensions.worry + dimensions.cognitive + dimensions.urgency + dimensions.emotional) / 2.5,
   );
 
+  const toggleContext = (id: string) => {
+    setSelectedContexts(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id],
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -50,17 +58,17 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
 
     if (editItem) {
       if (isSubItem || editItem.weightDimensions) {
-        updateItem(editItem.id, { name, compartment, utility, description, tags: parsedTags, weightDimensions: dimensions });
+        updateItem(editItem.id, { name, compartment, utility, description, tags: parsedTags, weightDimensions: dimensions, contexts: selectedContexts });
       } else {
-        updateItem(editItem.id, { name, compartment, weight, utility, description, tags: parsedTags });
+        updateItem(editItem.id, { name, compartment, weight, utility, description, tags: parsedTags, contexts: selectedContexts });
       }
     } else if (isSubItem) {
       addItem({
         name, compartment, weight: computedWeight, utility, description,
-        tags: parsedTags, parentId, weightDimensions: dimensions,
+        tags: parsedTags, parentId, weightDimensions: dimensions, contexts: selectedContexts,
       });
     } else {
-      addItem({ name, compartment, weight, utility, description, tags: parsedTags });
+      addItem({ name, compartment, weight, utility, description, tags: parsedTags, contexts: selectedContexts });
     }
     onClose();
   };
@@ -241,6 +249,29 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
               />
             </div>
+
+            {availableContexts.length > 0 && (
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">Contexts (when is this relevant?)</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableContexts.map(ctx => (
+                    <button
+                      key={ctx.id}
+                      type="button"
+                      onClick={() => toggleContext(ctx.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        selectedContexts.includes(ctx.id)
+                          ? 'bg-amber-500/20 border border-amber-500/30 text-amber-300'
+                          : 'bg-slate-800 border border-slate-700 text-slate-500 hover:border-slate-600'
+                      }`}
+                    >
+                      {ctx.emoji} {ctx.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-600 mt-1">No context = shows everywhere</p>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <button

@@ -21,7 +21,7 @@ interface PackStore {
 
   // Item actions
   addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps' | 'parentId' | 'isContainer' | 'originalWeight' | 'originalUtility' | 'contexts'> & { parentId?: string | null; contexts?: string[] }) => void;
-  updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags' | 'weightDimensions'>>) => void;
+  updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags' | 'weightDimensions' | 'contexts'>>) => void;
   dropItem: (id: string, releaseNote?: string, cascade?: boolean) => void;
   restoreItem: (id: string) => void;
   markAsContainer: (id: string) => void;

@@ -48,22 +48,24 @@ export default function PackView() {
   const profile = usePackStore(s => s.profile);
   const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
-  const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
-  const getActiveItems = usePackStore(s => s.getActiveItems);
+  const getContextItems = usePackStore(s => s.getContextItems);
   const agentNotes = usePackStore(s => s.agentNotes);
+  const activeContext = usePackStore(s => s.profile.activeContext);
   const displayConfig = useDisplayMode();
   const [showAdd, setShowAdd] = useState(false);
 
   const balance = getLoadBalance();
-  const getLeafItems = usePackStore(s => s.getLeafItems);
   const getEffectiveWeight = usePackStore(s => s.getEffectiveWeight);
   const getEffectiveUtility = usePackStore(s => s.getEffectiveUtility);
-  const getRootItems = usePackStore(s => s.getRootItems);
+  const getChildItems = usePackStore(s => s.getChildItems);
   const terrain = TERRAIN_META[profile.currentTerrain];
   const recentNotes = agentNotes.filter(n => n.status === 'pending').slice(0, 3);
-  const activeItems = getActiveItems();
-  const leafItems = getLeafItems();
-  const rootItems = getRootItems();
+
+  // Context-filtered items
+  const contextItems = getContextItems();
+  const activeParentIds = new Set(contextItems.filter(i => i.parentId).map(i => i.parentId));
+  const leafItems = contextItems.filter(i => !activeParentIds.has(i.id));
+  const rootItems = contextItems.filter(i => !i.parentId);
 
   const totalWeight = leafItems.reduce((s, i) => s + i.weight, 0);
   const totalUtility = leafItems.reduce((s, i) => s + i.utility, 0);
@@ -90,7 +92,7 @@ export default function PackView() {
           <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
             <span>{terrain.emoji} {terrain.label}</span>
             <span className="text-slate-700">|</span>
-            <span>{activeItems.length} items</span>
+            <span>{contextItems.length} items</span>
           </div>
         </div>
         <div className="text-right">
@@ -127,7 +129,7 @@ export default function PackView() {
       <RecoveryCheckIn />
 
       {/* Quick insight bar */}
-      {activeItems.length > 0 && (
+      {displayConfig.showTotals && contextItems.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Total Load</span>
@@ -170,7 +172,7 @@ export default function PackView() {
       )}
 
       {/* Empty state guidance */}
-      {activeItems.length === 0 && (
+      {contextItems.length === 0 && (
         <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-6 text-center space-y-3">
           <h2 className="text-lg font-medium text-white">Your pack is empty</h2>
           <p className="text-sm text-slate-400">
@@ -213,8 +215,8 @@ export default function PackView() {
         {COMPARTMENTS.map(comp => {
           const meta = COMPARTMENT_META[comp];
           const stats = getCompartmentStats(comp);
-          const items = getCompartmentItems(comp);
-          const top3 = [...items].sort((a, b) => b.weight - a.weight).slice(0, 3);
+          const compItems = contextItems.filter(i => i.compartment === comp && !i.parentId);
+          const top3 = [...compItems].sort((a, b) => getEffectiveWeight(b.id) - getEffectiveWeight(a.id)).slice(0, 3);
 
           return (
             <motion.button
@@ -230,7 +232,7 @@ export default function PackView() {
                   <span className="font-medium text-white text-sm">{meta.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">{stats.count}</span>
+                  <span className="text-xs text-slate-500">{compItems.length}</span>
                   <ArrowRight size={12} className="text-slate-700 group-hover:text-slate-400 transition-colors" />
                 </div>
               </div>
@@ -250,18 +252,22 @@ export default function PackView() {
               {top3.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {top3.map(item => {
-                    const delta = item.weight - item.utility;
+                    const ew = getEffectiveWeight(item.id);
+                    const eu = getEffectiveUtility(item.id);
+                    const delta = ew - eu;
                     const pillColor = delta > 2 ? 'bg-rose-500/20 text-rose-300' : delta < -2 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400';
+                    const children = getChildItems(item.id);
                     return (
                       <span key={item.id} className={`text-[11px] px-2 py-0.5 rounded-full ${pillColor}`}>
-                        {item.name} <span className="font-mono">{item.weight}</span>
+                        {item.name} <span className="font-mono">{ew}</span>
+                        {children.length > 0 && <span className="text-slate-500 ml-0.5">({children.length})</span>}
                       </span>
                     );
                   })}
                 </div>
               )}
 
-              {stats.count === 0 && (
+              {compItems.length === 0 && (
                 <p className="text-xs text-slate-600 mt-2 italic">{EMPTY_STATES[comp]}</p>
               )}
             </motion.button>
@@ -270,7 +276,7 @@ export default function PackView() {
       </div>
 
       {/* Agent feed preview */}
-      {recentNotes.length > 0 && (
+      {displayConfig.framingStyle !== 'minimal' && recentNotes.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-slate-400">Agent Observations</h2>

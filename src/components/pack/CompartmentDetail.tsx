@@ -7,6 +7,7 @@ import { usePackStore } from '../../store';
 import { COMPARTMENT_META, AGENTS, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
 import type { Compartment, PackItem, WeightDimensions } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
+import { useDisplayMode } from '../shared/DisplayModeProvider';
 import AddItemModal from '../items/AddItemModal';
 
 type SortKey = 'weight' | 'utility' | 'delta' | 'updated';
@@ -23,6 +24,8 @@ export default function CompartmentDetail() {
   const setNextStep = usePackStore(s => s.setNextStep);
   const completeNextStep = usePackStore(s => s.completeNextStep);
   const markAsContainer = usePackStore(s => s.markAsContainer);
+  const activeContext = usePackStore(s => s.profile.activeContext);
+  const displayConfig = useDisplayMode();
 
   const [sort, setSort] = useState<SortKey>('weight');
   const [deadWeightOnly, setDeadWeightOnly] = useState(false);
@@ -42,15 +45,18 @@ export default function CompartmentDetail() {
   const meta = COMPARTMENT_META[comp];
   const stats = getCompartmentStats(comp);
 
-  // Show root items for this compartment (no parent, or parent in different compartment)
-  let filtered = items.filter(i => i.compartment === comp && !i.droppedAt && !i.parentId);
+  // Show root items for this compartment, filtered by active context
+  let filtered = items.filter(i =>
+    i.compartment === comp && !i.droppedAt && !i.parentId &&
+    (activeContext === null || i.contexts.includes(activeContext) || i.contexts.length === 0)
+  );
   if (deadWeightOnly) filtered = filtered.filter(i => {
     const ew = getEffectiveWeight(i.id);
     const eu = getEffectiveUtility(i.id);
     return ew > eu + 3;
   });
 
-  const sorted = [...filtered].sort((a, b) => {
+  const allSorted = [...filtered].sort((a, b) => {
     switch (sort) {
       case 'weight': return getEffectiveWeight(b.id) - getEffectiveWeight(a.id);
       case 'utility': return getEffectiveUtility(b.id) - getEffectiveUtility(a.id);
@@ -59,6 +65,9 @@ export default function CompartmentDetail() {
       default: return 0;
     }
   });
+  const sorted = displayConfig.maxVisibleItems
+    ? allSorted.slice(0, displayConfig.maxVisibleItems)
+    : allSorted;
 
   const toggleChildren = (id: string) => {
     setExpandedChildren(prev => {
@@ -98,7 +107,7 @@ export default function CompartmentDetail() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
-                {item.isContainer && (
+                {displayConfig.showFullTree && item.isContainer && (
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleChildren(item.id); }}
                     className="text-slate-600 hover:text-slate-400 shrink-0"
@@ -133,7 +142,7 @@ export default function CompartmentDetail() {
             )}
 
             {/* Dimension breakdown for sub-items */}
-            {item.weightDimensions && (
+            {displayConfig.showDimensions && item.weightDimensions && (
               <div className="flex gap-2 mt-1.5">
                 {(Object.entries(item.weightDimensions) as [keyof WeightDimensions, number][]).map(([key, val]) => (
                   <span key={key} className={`text-[10px] ${val >= 4 ? 'text-rose-400' : 'text-slate-600'}`}>
@@ -353,7 +362,7 @@ export default function CompartmentDetail() {
         </motion.div>
 
         {/* Render children inline when expanded */}
-        {childrenVisible && children.length > 0 && (
+        {displayConfig.showFullTree && childrenVisible && children.length > 0 && (
           <div className="space-y-2 mt-2">
             {children.map(child => renderItem(child, depth + 1))}
           </div>

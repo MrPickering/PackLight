@@ -5,6 +5,7 @@ import { usePackStore } from '../../store';
 import { AGENTS, TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { TerrainType, PackItem } from '../../types';
 import { calculateLoadBalance } from '../../utils/loadBalance';
+import { useDisplayMode } from '../shared/DisplayModeProvider';
 import ReleaseRitualModal from '../items/ReleaseRitualModal';
 
 type Step = 'review' | 'briefing' | 'triage' | 'terrain' | 'summary';
@@ -35,6 +36,7 @@ export default function RepackMode() {
   const [triageNextStep, setTriageNextStep] = useState<Record<string, string>>({});
   const [releaseQueue, setReleaseQueue] = useState<PackItem[]>([]);
   const [currentReleaseItem, setCurrentReleaseItem] = useState<PackItem | null>(null);
+  const displayConfig = useDisplayMode();
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -353,7 +355,7 @@ export default function RepackMode() {
           {step === 'summary' && (
             <div className="text-center py-8 space-y-6">
               <div className="space-y-2">
-                <p className="text-sm text-slate-400">Load Balance</p>
+                <p className="text-sm text-slate-400">{displayConfig.framingStyle === 'progress' ? 'Progress' : 'Load Balance'}</p>
                 <div className="flex items-center justify-center gap-4">
                   <div>
                     <span className="font-mono text-2xl text-slate-500">{initialScore}</span>
