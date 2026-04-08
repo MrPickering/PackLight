@@ -49,7 +49,6 @@ export default function PackView() {
   const navigate = useNavigate();
   const profile = usePackStore(s => s.profile);
   const getLoadBalance = usePackStore(s => s.getLoadBalance);
-  const getCompartmentStats = usePackStore(s => s.getCompartmentStats);
   const getContextItems = usePackStore(s => s.getContextItems);
   const agentNotes = usePackStore(s => s.agentNotes);
   const allItems = usePackStore(s => s.items);
@@ -253,8 +252,13 @@ export default function PackView() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {COMPARTMENTS.map(comp => {
           const meta = COMPARTMENT_META[comp];
-          const stats = getCompartmentStats(comp);
           const compItems = contextItems.filter(i => i.compartment === comp && !i.parentId);
+          const allCompItems = contextItems.filter(i => i.compartment === comp);
+          // Leaf-only weight/utility to avoid double-counting
+          const compParentIds = new Set(allCompItems.filter(i => i.parentId).map(i => i.parentId));
+          const compLeafs = allCompItems.filter(i => !compParentIds.has(i.id));
+          const compWeight = compLeafs.reduce((s, i) => s + i.weight, 0);
+          const compUtility = compLeafs.reduce((s, i) => s + i.utility, 0);
           const top3 = [...compItems].sort((a, b) => getEffectiveWeight(b.id) - getEffectiveWeight(a.id)).slice(0, 3);
 
           return (
@@ -278,12 +282,12 @@ export default function PackView() {
 
               <p className="text-[11px] text-slate-600 mb-2">{COMPARTMENT_ACTIONS[comp]}</p>
 
-              {stats.count > 0 && (
+              {compItems.length > 0 && (
                 <>
-                  <WeightUtilityBar weight={stats.totalWeight} utility={stats.totalUtility} />
+                  <WeightUtilityBar weight={compWeight} utility={compUtility} />
                   <div className="flex gap-3 mt-1.5 text-xs">
-                    <span className="text-rose-400 font-mono">W:{stats.totalWeight}</span>
-                    <span className="text-emerald-400 font-mono">U:{stats.totalUtility}</span>
+                    <span className="text-rose-400 font-mono">W:{compWeight}</span>
+                    <span className="text-emerald-400 font-mono">U:{compUtility}</span>
                   </div>
                 </>
               )}
