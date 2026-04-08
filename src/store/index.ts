@@ -393,14 +393,14 @@ export const usePackStore = create<PackStore>()(
         set(state => ({
           profile: {
             ...state.profile,
-            firstStepsStep: Math.min(4, state.profile.firstStepsStep + 1) as FirstStepsStep,
+            firstStepsStep: Math.min(5, state.profile.firstStepsStep + 1) as FirstStepsStep,
           },
         }));
       },
 
       completeFirstSteps: () => {
         set(state => ({
-          profile: { ...state.profile, firstStepsComplete: true, firstStepsStep: 4 as FirstStepsStep },
+          profile: { ...state.profile, firstStepsComplete: true, firstStepsStep: 5 as FirstStepsStep },
         }));
       },
 
@@ -603,7 +603,7 @@ export const usePackStore = create<PackStore>()(
           const profile = state.profile as Record<string, unknown>;
           if (profile) {
             profile.firstStepsComplete = profile.firstStepsComplete ?? true;
-            profile.firstStepsStep = profile.firstStepsStep ?? 4;
+            profile.firstStepsStep = profile.firstStepsStep ?? 5;
             profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? (profile.terrainSetAt as string) ?? new Date().toISOString();
             profile.dismissedPrompts = profile.dismissedPrompts ?? [];
           }

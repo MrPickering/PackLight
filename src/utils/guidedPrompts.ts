@@ -147,6 +147,20 @@ export function generateGuidedPrompts(input: GuidedPromptsInput): GuidedPrompt[]
     });
   }
 
+  // ── Connection discovery (priority 18) ──
+
+  // Items sharing tags or contexts → nudge toward connections tab
+  const itemsWithTags = active.filter(i => i.tags.length > 0);
+  const itemsWithContexts = active.filter(i => i.contexts.length > 0);
+  if (itemsWithTags.length >= 3 || itemsWithContexts.length >= 3) {
+    prompts.push({
+      id: 'connections-discovery', type: 'pattern', priority: 18,
+      message: "Your items share tags and contexts. Check the Connections tab in Trail Map to see relationships PackLight has discovered.",
+      action: { label: 'View Connections', route: '/trail', actionType: 'navigate' },
+      dismissKey: 'connections-discovery',
+    });
+  }
+
   // ── Item rules (priority 20-29) ──
 
   for (const item of roots) {

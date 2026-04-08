@@ -317,7 +317,7 @@ export default function Onboarding() {
                       <p>You mentioned <span className="text-white font-medium">{filledItems.length} thing{filledItems.length !== 1 ? 's' : ''}</span> on your mind.</p>
                     )}
                     <p>Your recovery score is <span className="text-amber-400 font-mono font-medium">{recoveryNormalized.toFixed(1)}/10</span>.</p>
-                    <p>The app will help you discover more through journaling and weekly check-ins. This is your starting point, not a final answer.</p>
+                    <p>Next, we'll walk you through the core loop: <span className="text-white">break things down</span> into pieces, <span className="text-white">classify</span> what you find, and <span className="text-white">discover connections</span> between them.</p>
                   </div>
                 </div>
 

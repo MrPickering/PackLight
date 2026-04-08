@@ -22,7 +22,7 @@ export const DEFAULT_CONTEXTS: LifeContext[] = [
 ];
 
 export type GuidedPromptType = 'item' | 'pattern' | 'milestone';
-export type FirstStepsStep = 0 | 1 | 2 | 3 | 4;
+export type FirstStepsStep = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface GuidedPrompt {
   id: string;
