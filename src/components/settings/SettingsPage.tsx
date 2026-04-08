@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import { Download, Upload, Trash2, Eye, EyeOff } from 'lucide-react';
 import { usePackStore } from '../../store';
-import { TERRAIN_META } from '../../types';
-import type { TerrainType } from '../../types';
+import { TERRAIN_META, DEFAULT_CONTEXTS } from '../../types';
+import type { TerrainType, DisplayMode } from '../../types';
+
+const DISPLAY_MODES: { id: DisplayMode; label: string; description: string }[] = [
+  { id: 'default', label: 'Default', description: 'Full interface, all features visible' },
+  { id: 'focused', label: 'Focused', description: 'One thing at a time, minimal navigation' },
+  { id: 'structured', label: 'Structured', description: 'Full tree view, explicit categories, predictable layout' },
+  { id: 'low-energy', label: 'Low Energy', description: 'Top-level only, one-tap interactions, minimal demand' },
+  { id: 'gentle', label: 'Gentle', description: 'Progress-oriented framing, no alarming totals' },
+];
 
 export default function SettingsPage() {
   const profile = usePackStore(s => s.profile);
   const setProfile = usePackStore(s => s.setProfile);
   const setTerrain = usePackStore(s => s.setTerrain);
+  const setDisplayMode = usePackStore(s => s.setDisplayMode);
   const items = usePackStore(s => s.items);
   const journal = usePackStore(s => s.journal);
   const agentNotes = usePackStore(s => s.agentNotes);
@@ -26,7 +35,7 @@ export default function SettingsPage() {
 
   const handleExport = () => {
     const data = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       profile,
       items,
@@ -52,15 +61,26 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.version === 1 || data.version === 2) {
+        if (data.version >= 1 && data.version <= 3) {
           const importedProfile = {
             ...data.profile,
             recoveryHistory: data.profile.recoveryHistory ?? [],
             loadBalanceHistory: data.profile.loadBalanceHistory ?? [],
+            displayMode: data.profile.displayMode ?? 'default',
+            contexts: data.profile.contexts ?? DEFAULT_CONTEXTS,
+            activeContext: data.profile.activeContext ?? null,
           };
+          const importedItems = (data.items ?? []).map((item: Record<string, unknown>) => ({
+            ...item,
+            parentId: item.parentId ?? null,
+            isContainer: item.isContainer ?? false,
+            originalWeight: item.originalWeight ?? item.weight,
+            originalUtility: item.originalUtility ?? item.utility,
+            contexts: item.contexts ?? [],
+          }));
           usePackStore.setState({
             profile: importedProfile,
-            items: data.items,
+            items: importedItems,
             journal: data.journal,
             agentNotes: data.agentNotes,
           });
@@ -77,7 +97,11 @@ export default function SettingsPage() {
       items: [],
       agentNotes: [],
       journal: [],
-      profile: { name: '', currentTerrain: 'camp', terrainSetAt: new Date().toISOString(), paceScoreHistory: [], recoveryHistory: [], loadBalanceHistory: [] },
+      profile: {
+        name: '', currentTerrain: 'camp', terrainSetAt: new Date().toISOString(),
+        paceScoreHistory: [], recoveryHistory: [], loadBalanceHistory: [],
+        displayMode: 'default', contexts: DEFAULT_CONTEXTS, activeContext: null,
+      },
       onboardingComplete: false,
       lastDecayRun: null,
     });
@@ -103,7 +127,7 @@ export default function SettingsPage() {
           />
         </div>
         <div>
-          <label className="block text-xs text-slate-500 mb-2">Current Terrain</label>
+          <label className="block text-xs text-slate-500 mb-2">How does life feel?</label>
           <div className="grid grid-cols-3 gap-2">
             {(['summit', 'downhill', 'camp', 'uphill', 'ridge', 'swamp'] as TerrainType[]).map(t => {
               const meta = TERRAIN_META[t];
@@ -125,10 +149,32 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Display Mode */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-slate-400">Display Mode</h2>
+        <p className="text-xs text-slate-600">Different brains process load differently. Choose what works for you.</p>
+        <div className="space-y-2">
+          {DISPLAY_MODES.map(mode => (
+            <button
+              key={mode.id}
+              onClick={() => setDisplayMode(mode.id)}
+              className={`w-full p-3 rounded-xl text-left transition-colors ${
+                profile.displayMode === mode.id
+                  ? 'bg-amber-500/20 border border-amber-500/30'
+                  : 'bg-slate-900 border border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="text-sm font-medium text-white">{mode.label}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{mode.description}</div>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* API Key */}
       <section className="space-y-4">
         <h2 className="text-sm font-medium text-slate-400">Anthropic API Key</h2>
-        <p className="text-xs text-slate-600">Required for AI agent conversations and journal analysis. Stored locally in your browser.</p>
+        <p className="text-xs text-slate-600">Optional. Enables AI agent conversations and journal analysis. Stored locally in your browser. The app works fully without it.</p>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -192,12 +238,15 @@ export default function SettingsPage() {
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-slate-400">About</h2>
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <p className="text-sm text-white font-medium">PackLight v1.0</p>
+          <p className="text-sm text-white font-medium">PackLight v0.1.0</p>
           <p className="text-xs text-slate-500 mt-1">
-            Agentic life load management. Make your invisible backpack visible, measurable, and strategically manageable.
+            Cognitive load management. See, quantify, and manage what you carry.
           </p>
           <p className="text-xs text-slate-600 mt-2">
             {items.length} items | {journal.length} journal entries | {agentNotes.length} agent notes
+          </p>
+          <p className="text-xs text-slate-600 mt-1">
+            Open source under MIT License
           </p>
         </div>
       </section>

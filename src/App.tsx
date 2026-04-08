@@ -10,6 +10,7 @@ import TrailMap from './components/trail/TrailMap';
 import RepackMode from './components/repack/RepackMode';
 import SettingsPage from './components/settings/SettingsPage';
 import Onboarding from './components/onboarding/Onboarding';
+import DisplayModeProvider from './components/shared/DisplayModeProvider';
 
 export default function App() {
   const onboardingComplete = usePackStore(s => s.onboardingComplete);
@@ -40,18 +41,20 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<PackView />} />
-          <Route path="/pack/:compartment" element={<CompartmentDetail />} />
-          <Route path="/journal" element={<JournalPage />} />
-          <Route path="/agents" element={<AgentFeed />} />
-          <Route path="/trail" element={<TrailMap />} />
-          <Route path="/repack" element={<RepackMode />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <DisplayModeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<PackView />} />
+            <Route path="/pack/:compartment" element={<CompartmentDetail />} />
+            <Route path="/journal" element={<JournalPage />} />
+            <Route path="/agents" element={<AgentFeed />} />
+            <Route path="/trail" element={<TrailMap />} />
+            <Route path="/repack" element={<RepackMode />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </DisplayModeProvider>
   );
 }

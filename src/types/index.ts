@@ -4,6 +4,23 @@ export type TerrainType = 'uphill' | 'downhill' | 'swamp' | 'ridge' | 'camp' | '
 
 export type AgentId = 'geologist' | 'locksmith' | 'blacksmith' | 'quartermaster' | 'navigator' | 'archivist';
 
+export type DisplayMode = 'default' | 'focused' | 'structured' | 'low-energy' | 'gentle';
+
+export interface LifeContext {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+}
+
+export const DEFAULT_CONTEXTS: LifeContext[] = [
+  { id: 'work', name: 'Work', emoji: '💼', color: 'blue' },
+  { id: 'home', name: 'Home', emoji: '🏠', color: 'amber' },
+  { id: 'social', name: 'Social', emoji: '👥', color: 'violet' },
+  { id: 'creative', name: 'Creative', emoji: '✨', color: 'emerald' },
+  { id: 'health', name: 'Health', emoji: '💪', color: 'rose' },
+];
+
 export interface NextStep {
   text: string;
   createdAt: string;
@@ -54,6 +71,7 @@ export interface PackItem {
   originalWeight: number;
   originalUtility: number;
   weightDimensions?: WeightDimensions;
+  contexts: string[];
   metadata?: Record<string, unknown>;
   sourceRef?: string;
 }
@@ -110,6 +128,9 @@ export interface UserProfile {
   paceScoreHistory: { date: string; value: number }[];
   recoveryHistory: RecoveryCheck[];
   loadBalanceHistory: { date: string; value: number }[];
+  displayMode: DisplayMode;
+  contexts: LifeContext[];
+  activeContext: string | null;
 }
 
 export const COMPARTMENT_META: Record<Compartment, { label: string; emoji: string; color: string }> = {

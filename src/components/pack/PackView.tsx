@@ -6,6 +6,8 @@ import { COMPARTMENT_META, TERRAIN_META, AGENTS } from '../../types';
 import type { Compartment, AgentId } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
 import RecoveryCheckIn from '../shared/RecoveryCheckIn';
+import ContextSwitcher from '../shared/ContextSwitcher';
+import { useDisplayMode } from '../shared/DisplayModeProvider';
 import { useState } from 'react';
 import AddItemModal from '../items/AddItemModal';
 
@@ -49,6 +51,7 @@ export default function PackView() {
   const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
   const getActiveItems = usePackStore(s => s.getActiveItems);
   const agentNotes = usePackStore(s => s.agentNotes);
+  const displayConfig = useDisplayMode();
   const [showAdd, setShowAdd] = useState(false);
 
   const balance = getLoadBalance();
@@ -106,12 +109,19 @@ export default function PackView() {
             {trend === 0 && <Minus size={16} className="text-slate-500" />}
           </div>
           <span className="text-xs text-slate-500">Load Balance</span>
-          <span className={`block text-[10px] ${scoreColor(balance.score)}`}>{scoreLabel(balance.score)}</span>
-          {balance.strain >= 2 && (
+          <span className={`block text-[10px] ${scoreColor(balance.score)}`}>
+            {displayConfig.framingStyle === 'progress'
+              ? (balance.score >= 50 ? 'Making progress' : 'Room to grow')
+              : scoreLabel(balance.score)}
+          </span>
+          {displayConfig.showStrainWarnings && balance.strain >= 2 && (
             <span className="text-[10px] text-rose-400">High strain detected</span>
           )}
         </div>
       </div>
+
+      {/* Context switcher */}
+      <ContextSwitcher />
 
       {/* Recovery check-in */}
       <RecoveryCheckIn />

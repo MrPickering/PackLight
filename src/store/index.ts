@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck } from '../types';
+import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext } from '../types';
+import { DEFAULT_CONTEXTS } from '../types';
 import { calculatePaceScore } from '../utils/paceScore';
 import { calculateLoadBalance } from '../utils/loadBalance';
 import { runWeightDecay } from '../utils/weightDecay';
@@ -19,7 +20,7 @@ interface PackStore {
   lastDecayRun: string | null;
 
   // Item actions
-  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps' | 'parentId' | 'isContainer' | 'originalWeight' | 'originalUtility'> & { parentId?: string | null }) => void;
+  addItem: (item: Omit<PackItem, 'id' | 'createdAt' | 'updatedAt' | 'agentNotes' | 'weightHistory' | 'utilityHistory' | 'completedSteps' | 'parentId' | 'isContainer' | 'originalWeight' | 'originalUtility' | 'contexts'> & { parentId?: string | null; contexts?: string[] }) => void;
   updateItem: (id: string, updates: Partial<Pick<PackItem, 'name' | 'description' | 'weight' | 'utility' | 'compartment' | 'tags' | 'weightDimensions'>>) => void;
   dropItem: (id: string, releaseNote?: string, cascade?: boolean) => void;
   restoreItem: (id: string) => void;
@@ -45,6 +46,13 @@ interface PackStore {
 
   // Recovery
   addRecoveryCheck: (check: Omit<RecoveryCheck, 'id'>) => void;
+
+  // Context & Display
+  setActiveContext: (contextId: string | null) => void;
+  setDisplayMode: (mode: DisplayMode) => void;
+  addContext: (context: LifeContext) => void;
+  removeContext: (contextId: string) => void;
+  getContextItems: () => PackItem[];
 
   // Hierarchy helpers
   getChildItems: (parentId: string) => PackItem[];
@@ -81,6 +89,9 @@ export const usePackStore = create<PackStore>()(
         paceScoreHistory: [],
         recoveryHistory: [],
         loadBalanceHistory: [],
+        displayMode: 'default' as DisplayMode,
+        contexts: DEFAULT_CONTEXTS,
+        activeContext: null,
       },
       onboardingComplete: false,
       lastDecayRun: null,
@@ -111,6 +122,7 @@ export const usePackStore = create<PackStore>()(
           originalWeight: weight,
           originalUtility: itemData.utility,
           weight,
+          contexts: itemData.contexts ?? [],
           weightHistory: [{ date: now, value: weight }],
           utilityHistory: [{ date: now, value: itemData.utility }],
         };
@@ -327,6 +339,40 @@ export const usePackStore = create<PackStore>()(
         }));
       },
 
+      // ── Context & Display ──
+
+      setActiveContext: (contextId) => {
+        set(state => ({ profile: { ...state.profile, activeContext: contextId } }));
+      },
+
+      setDisplayMode: (mode) => {
+        set(state => ({ profile: { ...state.profile, displayMode: mode } }));
+      },
+
+      addContext: (context) => {
+        set(state => ({
+          profile: { ...state.profile, contexts: [...state.profile.contexts, context] },
+        }));
+      },
+
+      removeContext: (contextId) => {
+        set(state => ({
+          profile: {
+            ...state.profile,
+            contexts: state.profile.contexts.filter(c => c.id !== contextId),
+            activeContext: state.profile.activeContext === contextId ? null : state.profile.activeContext,
+          },
+        }));
+      },
+
+      getContextItems: () => {
+        const { items, profile } = get();
+        if (!profile.activeContext) return items.filter(i => !i.droppedAt);
+        return items.filter(i => !i.droppedAt && (
+          i.contexts.includes(profile.activeContext!) || i.contexts.length === 0
+        ));
+      },
+
       // ── Hierarchy helpers ──
 
       getChildItems: (parentId) =>
@@ -446,7 +492,7 @@ export const usePackStore = create<PackStore>()(
     }),
     {
       name: 'packlight-store',
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -464,6 +510,19 @@ export const usePackStore = create<PackStore>()(
             isContainer: item.isContainer ?? false,
             originalWeight: item.originalWeight ?? item.weight,
             originalUtility: item.originalUtility ?? item.utility,
+          }));
+        }
+        if (version < 4) {
+          const profile = state.profile as Record<string, unknown>;
+          if (profile) {
+            profile.displayMode = profile.displayMode ?? 'default';
+            profile.contexts = profile.contexts ?? DEFAULT_CONTEXTS;
+            profile.activeContext = profile.activeContext ?? null;
+          }
+          const items = (state.items ?? []) as Record<string, unknown>[];
+          state.items = items.map(item => ({
+            ...item,
+            contexts: (item as Record<string, unknown>).contexts ?? [],
           }));
         }
         return state;
