@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { TERRAIN_META } from '../../types';
 import type { TerrainType } from '../../types';
-import { autoCategorize } from '../../utils/autoCategorize';
+import { TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
 
 type Step = 'welcome' | 'profile' | 'whats-heavy' | 'recovery' | 'ready';
 const ALL_STEPS: Step[] = ['welcome', 'profile', 'whats-heavy', 'recovery', 'ready'];
@@ -28,8 +28,8 @@ export default function Onboarding() {
   const [name, setName] = useState('');
   const [terrain, setTerrainLocal] = useState<TerrainType>('camp');
 
-  // Free-text items
-  const [freeItems, setFreeItems] = useState(['', '', '']);
+  // Category-based selection instead of free text
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   // Recovery scores
   const [recovery, setRecovery] = useState<Record<string, number>>({
@@ -51,23 +51,52 @@ export default function Onboarding() {
     if (stepIndex > 0) setStep(ALL_STEPS[stepIndex - 1]);
   };
 
-  const filledItems = freeItems.filter(t => t.trim());
+  const toggleCategory = (id: string) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const recoveryTotal = Object.values(recovery).reduce((s, v) => s + v, 0);
   const recoveryNormalized = Math.round(((recoveryTotal - 5) / 2) * 10) / 10;
 
+  const selectedCats = TOP_LEVEL_CATEGORIES.filter(c => selectedCategories.has(c.id));
+
   const handleFinish = () => {
-    // Add free-text items as pack items
-    filledItems.forEach(text => {
-      const compartment = autoCategorize(text);
+    // Add selected categories as pack items with proper compartments and contexts
+    for (const cat of selectedCats) {
+      // Compute a representative weight from sub-item averages
+      const avgDims = cat.subItems.reduce(
+        (acc, si) => ({
+          stress: acc.stress + si.dimensions.stress / cat.subItems.length,
+          worry: acc.worry + si.dimensions.worry / cat.subItems.length,
+          cognitive: acc.cognitive + si.dimensions.cognitive / cat.subItems.length,
+          urgency: acc.urgency + si.dimensions.urgency / cat.subItems.length,
+          emotional: acc.emotional + si.dimensions.emotional / cat.subItems.length,
+        }),
+        { stress: 0, worry: 0, cognitive: 0, urgency: 0, emotional: 0 },
+      );
+      const roundedDims = {
+        stress: Math.round(avgDims.stress),
+        worry: Math.round(avgDims.worry),
+        cognitive: Math.round(avgDims.cognitive),
+        urgency: Math.round(avgDims.urgency),
+        emotional: Math.round(avgDims.emotional),
+      };
+
       addItem({
-        name: text.trim(),
-        compartment,
-        weight: 5,
-        utility: 5,
+        name: cat.label,
+        compartment: cat.compartment,
+        weight: dimensionsToWeight(roundedDims),
+        utility: cat.utility,
         description: '',
         tags: ['onboarding'],
+        contexts: cat.contexts,
+        weightDimensions: roundedDims,
       });
-    });
+    }
 
     // Save recovery baseline
     addRecoveryCheck({
@@ -119,7 +148,7 @@ export default function Onboarding() {
                 <div className="space-y-4">
                   <h1 className="text-3xl font-bold text-white">PackLight</h1>
                   <p className="text-lg text-slate-300 leading-relaxed">
-                    Everything you carry has weight — good and bad.
+                    Everything you carry has weight — good and bad. PackLight helps you see what's really there.
                   </p>
                   <div className="space-y-3 text-sm text-slate-400">
                     <div className="flex gap-3 items-start">
@@ -128,15 +157,15 @@ export default function Onboarding() {
                     </div>
                     <div className="flex gap-3 items-start">
                       <span className="text-amber-400 font-mono text-lg leading-none">2</span>
-                      <p><span className="text-white">See the real weight</span> — a promotion, a new baby, a loving relationship all weigh something. Not just the bad stuff.</p>
+                      <p><span className="text-white">Break it down</span> — most things aren't one thing. Decompose them until you reach the atomic pieces that actually make them heavy.</p>
                     </div>
                     <div className="flex gap-3 items-start">
                       <span className="text-amber-400 font-mono text-lg leading-none">3</span>
-                      <p><span className="text-white">Carry what matters, lighter</span> — the goal isn't an empty pack. It's the right load, carried consciously.</p>
+                      <p><span className="text-white">Classify & connect</span> — understand each piece (what, how, why) and see how they relate to each other across your life.</p>
                     </div>
                   </div>
                   <p className="text-xs text-slate-600 pt-2">
-                    Based on Holmes-Rahe (positive events are stressors too), allostatic load theory, and conservation of resources research.
+                    A second brain for what weighs on you. Informed by Holmes-Rahe, allostatic load theory, and conservation of resources research.
                   </p>
                 </div>
                 <button
@@ -211,36 +240,40 @@ export default function Onboarding() {
             {step === 'whats-heavy' && (
               <>
                 <div className="space-y-1">
-                  <h2 className="text-xl font-semibold text-white">What's taking up the most space?</h2>
+                  <h2 className="text-xl font-semibold text-white">What's weighing on you?</h2>
                   <p className="text-sm text-slate-500">
-                    Just 1-3 things. Don't overthink it — whatever comes to mind first.
+                    Tap the areas that take up space in your life. These become the big rocks you'll break down.
                   </p>
                 </div>
 
-                <div className="space-y-3">
-                  {freeItems.map((item, i) => (
-                    <input
-                      key={i}
-                      type="text"
-                      value={item}
-                      onChange={e => {
-                        const next = [...freeItems];
-                        next[i] = e.target.value;
-                        setFreeItems(next);
-                      }}
-                      placeholder={
-                        i === 0 ? 'Something on your mind...'
-                          : i === 1 ? 'Another thing...'
-                            : 'One more (optional)...'
-                      }
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
-                      autoFocus={i === 0}
-                    />
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  {TOP_LEVEL_CATEGORIES.map(cat => {
+                    const isSelected = selectedCategories.has(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => toggleCategory(cat.id)}
+                        className={`p-3 rounded-xl text-left transition-all ${
+                          isSelected
+                            ? 'bg-amber-500/20 border border-amber-500/30 ring-1 ring-amber-500/20'
+                            : 'bg-slate-900 border border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg">{cat.emoji}</span>
+                          {isSelected && <Check size={14} className="text-amber-400" />}
+                        </div>
+                        <div className="text-sm font-medium text-white mt-1">{cat.label}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {cat.subItems.length} things to explore
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <p className="text-xs text-slate-600">
-                  You'll discover more over time through journaling and check-ins. This is just a starting point.
+                  Pick as many as feel relevant. You'll decompose each one into smaller, more specific pieces next.
                 </p>
 
                 <div className="flex gap-3">
@@ -251,7 +284,7 @@ export default function Onboarding() {
                     onClick={goNext}
                     className="flex-1 py-3 bg-amber-500 text-slate-950 rounded-xl text-sm font-semibold hover:bg-amber-400 transition-colors flex items-center justify-center gap-2"
                   >
-                    {filledItems.length === 0 ? 'Skip' : 'Next'} <ArrowRight size={16} />
+                    {selectedCategories.size === 0 ? 'Skip' : `Next (${selectedCategories.size} selected)`} <ArrowRight size={16} />
                   </button>
                 </div>
               </>
@@ -261,9 +294,9 @@ export default function Onboarding() {
             {step === 'recovery' && (
               <>
                 <div className="space-y-1">
-                  <h2 className="text-xl font-semibold text-white">How well are you recovering?</h2>
+                  <h2 className="text-xl font-semibold text-white">Quick baseline check</h2>
                   <p className="text-sm text-slate-500">
-                    This helps us understand your capacity, not just your load.
+                    Rate where you are right now. This feeds your Load Balance score — how sustainable your current load is.
                   </p>
                 </div>
 
@@ -313,19 +346,21 @@ export default function Onboarding() {
                 <div className="space-y-3">
                   <h2 className="text-xl font-semibold text-white">You're ready</h2>
                   <div className="space-y-2 text-sm text-slate-400">
-                    {filledItems.length > 0 && (
-                      <p>You mentioned <span className="text-white font-medium">{filledItems.length} thing{filledItems.length !== 1 ? 's' : ''}</span> on your mind.</p>
+                    {selectedCats.length > 0 && (
+                      <p>You picked <span className="text-white font-medium">{selectedCats.length} area{selectedCats.length !== 1 ? 's' : ''}</span> to start with.</p>
                     )}
-                    <p>Your recovery score is <span className="text-amber-400 font-mono font-medium">{recoveryNormalized.toFixed(1)}/10</span>.</p>
+                    <p>Your recovery baseline is <span className="text-amber-400 font-mono font-medium">{recoveryNormalized.toFixed(1)}/10</span>.</p>
                     <p>Next, we'll walk you through the core loop: <span className="text-white">break things down</span> into pieces, <span className="text-white">classify</span> what you find, and <span className="text-white">discover connections</span> between them.</p>
                   </div>
                 </div>
 
-                {filledItems.length > 0 && (
-                  <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-1">
-                    <span className="text-xs text-slate-500">Starting with:</span>
-                    {filledItems.map((item, i) => (
-                      <div key={i} className="text-sm text-slate-300">{item}</div>
+                {selectedCats.length > 0 && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-1.5">
+                    <span className="text-xs text-slate-500">Your starting rocks:</span>
+                    {selectedCats.map(cat => (
+                      <div key={cat.id} className="flex items-center gap-2 text-sm text-slate-300">
+                        <span>{cat.emoji}</span> {cat.label}
+                      </div>
                     ))}
                   </div>
                 )}
