@@ -8,6 +8,7 @@ import JournalPage from './components/journal/JournalPage';
 import AgentFeed from './components/agents/AgentFeed';
 import TrailMap from './components/trail/TrailMap';
 import RepackMode from './components/repack/RepackMode';
+import DecomposeFlow from './components/decompose/DecomposeFlow';
 import SettingsPage from './components/settings/SettingsPage';
 import Onboarding from './components/onboarding/Onboarding';
 import FirstSteps from './components/onboarding/FirstSteps';
@@ -57,6 +58,8 @@ export default function App() {
             <Route path="/agents" element={<AgentFeed />} />
             <Route path="/trail" element={<TrailMap />} />
             <Route path="/repack" element={<RepackMode />} />
+            <Route path="/decompose" element={<DecomposeFlow />} />
+            <Route path="/decompose/:itemId" element={<DecomposeFlow />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

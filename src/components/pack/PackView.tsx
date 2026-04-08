@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, BookOpen, RefreshCw, TrendingUp, TrendingDown, Minus, ArrowRight } from 'lucide-react';
+import { Plus, BookOpen, RefreshCw, TrendingUp, TrendingDown, Minus, ArrowRight, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, TERRAIN_META, AGENTS } from '../../types';
@@ -57,6 +57,7 @@ export default function PackView() {
   const [showAdd, setShowAdd] = useState(false);
 
   const balance = getLoadBalance();
+  const getUnprocessedItems = usePackStore(s => s.getUnprocessedItems);
   const getEffectiveWeight = usePackStore(s => s.getEffectiveWeight);
   const getEffectiveUtility = usePackStore(s => s.getEffectiveUtility);
   const getChildItems = usePackStore(s => s.getChildItems);
@@ -68,6 +69,9 @@ export default function PackView() {
     items: allItems, profile, loadBalanceScore: balance.score, framingStyle: displayConfig.framingStyle,
   }), [allItems, profile, balance.score, displayConfig.framingStyle]);
   const visiblePrompts = displayConfig.showPrompts ? prompts.slice(0, displayConfig.maxPrompts) : [];
+
+  // Decomposition tracking
+  const unprocessedCount = getUnprocessedItems().length;
 
   // Feature gating
   const onboardingAge = profile.onboardingCompletedAt ? Math.floor((Date.now() - new Date(profile.onboardingCompletedAt).getTime()) / 86400000) : 999;
@@ -239,6 +243,17 @@ export default function PackView() {
         >
           <Plus size={16} /> Add Item
         </button>
+        {unprocessedCount > 0 && (
+          <button
+            onClick={() => navigate('/decompose')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-lg text-sm font-medium hover:bg-violet-500/30 transition-colors"
+          >
+            <Layers size={16} /> Decompose
+            <span className="bg-violet-500/30 text-violet-200 text-[10px] font-mono px-1.5 py-0.5 rounded-full">
+              {unprocessedCount}
+            </span>
+          </button>
+        )}
         <button
           onClick={() => navigate('/journal')}
           className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm hover:bg-slate-700 transition-colors"

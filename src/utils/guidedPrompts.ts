@@ -125,6 +125,28 @@ export function generateGuidedPrompts(input: GuidedPromptsInput): GuidedPrompt[]
     });
   }
 
+  // ── Decomposition rules (priority 15-19) ──
+
+  const unprocessed = active.filter(i => !i.isContainer && !i.isAtomic);
+  if (unprocessed.length >= 2) {
+    prompts.push({
+      id: 'unprocessed-items', type: 'pattern', priority: 15,
+      message: `You have ${unprocessed.length} items that haven't been examined yet. Breaking them down helps you see what's really there.`,
+      action: { label: 'Decompose', route: '/decompose', actionType: 'navigate' },
+      dismissKey: 'unprocessed-items',
+    });
+  }
+
+  const unclassifiedAtomic = active.filter(i => i.isAtomic && !i.classification);
+  if (unclassifiedAtomic.length >= 2) {
+    prompts.push({
+      id: 'unclassified-atomic', type: 'pattern', priority: 17,
+      message: `${unclassifiedAtomic.length} atomic items haven't been classified yet. The what/how/why helps you understand them.`,
+      action: { label: 'Classify', route: '/decompose', actionType: 'navigate' },
+      dismissKey: 'unclassified-atomic',
+    });
+  }
+
   // ── Item rules (priority 20-29) ──
 
   for (const item of roots) {

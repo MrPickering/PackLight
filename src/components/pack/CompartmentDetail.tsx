@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Filter, Check, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { ArrowLeft, Plus, Filter, Check, ChevronDown, ChevronUp, Layers, Atom } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { usePackStore } from '../../store';
@@ -217,13 +217,40 @@ export default function CompartmentDetail() {
                     </div>
                   )}
 
-                  {/* Unpack action */}
-                  {!item.isContainer && (
+                  {/* Classification display */}
+                  {item.isAtomic && item.classification && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                        <Atom size={10} /> Classification
+                      </span>
+                      {item.classification.what && (
+                        <p className="text-xs text-slate-400"><span className="text-amber-400">What:</span> {item.classification.what}</p>
+                      )}
+                      {item.classification.how && (
+                        <p className="text-xs text-slate-400"><span className="text-amber-400">How:</span> {item.classification.how}</p>
+                      )}
+                      {item.classification.why && (
+                        <p className="text-xs text-slate-400"><span className="text-amber-400">Why:</span> {item.classification.why}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {item.isAtomic && !item.classification && (
                     <button
-                      onClick={() => handleUnpack(item)}
+                      onClick={() => navigate(`/decompose/${item.id}`)}
+                      className="flex items-center gap-2 w-full py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 hover:bg-emerald-500/20 transition-colors justify-center"
+                    >
+                      <Atom size={12} /> Classify this — what, how, why?
+                    </button>
+                  )}
+
+                  {/* Unpack action */}
+                  {!item.isContainer && !item.isAtomic && (
+                    <button
+                      onClick={() => navigate(`/decompose/${item.id}`)}
                       className="flex items-center gap-2 w-full py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors justify-center"
                     >
-                      <Package size={14} /> Unpack this — what's inside?
+                      <Layers size={14} /> Unpack this — what's inside?
                     </button>
                   )}
 
@@ -349,6 +376,15 @@ export default function CompartmentDetail() {
                         )}
                       </div>
                     )}
+
+                    <a
+                      href="https://coach-mark.ai"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-[11px] text-slate-600 hover:text-violet-400 transition-colors mt-1"
+                    >
+                      A coach can help with this. <span className="underline">coach-mark.ai →</span>
+                    </a>
                   </div>
 
                   <button

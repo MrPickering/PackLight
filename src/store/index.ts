@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext, FirstStepsStep } from '../types';
+import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext, FirstStepsStep, ItemClassification } from '../types';
 import { DEFAULT_CONTEXTS } from '../types';
 import { calculatePaceScore } from '../utils/paceScore';
 import { calculateLoadBalance } from '../utils/loadBalance';
@@ -25,6 +25,12 @@ interface PackStore {
   dropItem: (id: string, releaseNote?: string, cascade?: boolean) => void;
   restoreItem: (id: string) => void;
   markAsContainer: (id: string) => void;
+
+  // Classification & decomposition
+  classifyItem: (id: string, classification: ItemClassification) => void;
+  markAtomic: (id: string) => void;
+  getUnprocessedItems: () => PackItem[];
+  getAtomicItems: () => PackItem[];
 
   // Lightening actions
   setLighteningApproach: (id: string, approach: string) => void;
@@ -130,6 +136,7 @@ export const usePackStore = create<PackStore>()(
           agentNotes: [],
           completedSteps: [],
           isContainer: false,
+          isAtomic: false,
           originalWeight: weight,
           originalUtility: itemData.utility,
           weight,
@@ -264,6 +271,33 @@ export const usePackStore = create<PackStore>()(
             };
           }),
         }));
+      },
+
+      classifyItem: (id, classification) => {
+        const now = new Date().toISOString();
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id ? { ...item, classification: { ...classification, classifiedAt: now }, updatedAt: now } : item,
+          ),
+        }));
+      },
+
+      markAtomic: (id) => {
+        const now = new Date().toISOString();
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id ? { ...item, isAtomic: true, updatedAt: now } : item,
+          ),
+        }));
+      },
+
+      getUnprocessedItems: () => {
+        const items = get().items.filter(i => !i.droppedAt);
+        return items.filter(i => !i.isContainer && !i.isAtomic);
+      },
+
+      getAtomicItems: () => {
+        return get().items.filter(i => !i.droppedAt && i.isAtomic === true);
       },
 
       addAgentNote: (note) => {
@@ -532,7 +566,7 @@ export const usePackStore = create<PackStore>()(
     }),
     {
       name: 'packlight-store',
-      version: 5,
+      version: 6,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -573,6 +607,20 @@ export const usePackStore = create<PackStore>()(
             profile.onboardingCompletedAt = profile.onboardingCompletedAt ?? (profile.terrainSetAt as string) ?? new Date().toISOString();
             profile.dismissedPrompts = profile.dismissedPrompts ?? [];
           }
+        }
+        if (version < 6) {
+          const items = (state.items ?? []) as Record<string, unknown>[];
+          // Auto-mark lightweight leaf items as atomic to avoid burdening existing users
+          const parentIds = new Set(items.filter(i => (i as Record<string, unknown>).parentId).map(i => (i as Record<string, unknown>).parentId));
+          state.items = items.map(item => {
+            const isLeaf = !parentIds.has(item.id);
+            const isLightweight = isLeaf && typeof item.weight === 'number' && item.weight <= 3;
+            return {
+              ...item,
+              isAtomic: item.isAtomic ?? (isLightweight ? true : false),
+              classification: item.classification ?? undefined,
+            };
+          });
         }
         return state;
       },

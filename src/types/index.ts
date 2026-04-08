@@ -38,6 +38,13 @@ export interface GuidedPrompt {
   dismissKey: string;
 }
 
+export interface ItemClassification {
+  what: string;       // "What is this thing?"
+  how: string;        // "How does it affect your daily life?"
+  why: string;        // "Why does it weigh on you?"
+  classifiedAt: string;
+}
+
 export interface NextStep {
   text: string;
   createdAt: string;
@@ -89,6 +96,8 @@ export interface PackItem {
   originalUtility: number;
   weightDimensions?: WeightDimensions;
   contexts: string[];
+  classification?: ItemClassification;
+  isAtomic?: boolean;
   metadata?: Record<string, unknown>;
   sourceRef?: string;
 }
