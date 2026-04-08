@@ -71,9 +71,19 @@ export default function PackView() {
 
   // Feature gating
   const onboardingAge = profile.onboardingCompletedAt ? Math.floor((Date.now() - new Date(profile.onboardingCompletedAt).getTime()) / 86400000) : 999;
+  const setActiveContext = usePackStore(s => s.setActiveContext);
 
-  // Context-filtered items
-  const contextItems = getContextItems();
+  // Context-filtered items — but if the switcher would be hidden, ignore context filter
+  const allActiveItems = allItems.filter(i => !i.droppedAt);
+  const uniqueContexts = new Set(allActiveItems.flatMap(i => i.contexts));
+  const shouldShowContextSwitcher = uniqueContexts.size >= 2;
+
+  // Reset stale context filter when switcher isn't visible
+  if (!shouldShowContextSwitcher && profile.activeContext !== null) {
+    setActiveContext(null);
+  }
+
+  const contextItems = shouldShowContextSwitcher ? getContextItems() : allActiveItems;
   const activeParentIds = new Set(contextItems.filter(i => i.parentId).map(i => i.parentId));
   const leafItems = contextItems.filter(i => !activeParentIds.has(i.id));
   const rootItems = contextItems.filter(i => !i.parentId);
@@ -134,10 +144,7 @@ export default function PackView() {
       </div>
 
       {/* Context switcher — show after items exist in 2+ contexts */}
-      {(() => {
-        const uniqueCtx = new Set(contextItems.flatMap(i => i.contexts));
-        return uniqueCtx.size >= 2 ? <ContextSwitcher /> : null;
-      })()}
+      {shouldShowContextSwitcher && <ContextSwitcher />}
 
       {/* Guided prompts */}
       {visiblePrompts.length > 0 && (
