@@ -117,12 +117,6 @@ export const usePackStore = create<PackStore>()(
         const now = new Date().toISOString();
         const parentId = itemData.parentId ?? null;
 
-        // Enforce depth limit of 3
-        if (parentId) {
-          const depth = get().getItemDepth(parentId);
-          if (depth >= 2) return; // parent is already at max depth
-        }
-
         const weight = itemData.weightDimensions
           ? dimensionsToWeight(itemData.weightDimensions)
           : itemData.weight;

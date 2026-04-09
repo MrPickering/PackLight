@@ -22,7 +22,7 @@ export default function DecomposeFlow() {
   const getUnprocessedItems = usePackStore(s => s.getUnprocessedItems);
   const getChildItems = usePackStore(s => s.getChildItems);
   const getEffectiveWeight = usePackStore(s => s.getEffectiveWeight);
-  const getItemDepth = usePackStore(s => s.getItemDepth);
+
 
   // Stack of item IDs we're decomposing (allows going deeper)
   const [decomposeStack, setDecomposeStack] = useState<string[]>(routeItemId ? [routeItemId] : []);
@@ -57,8 +57,6 @@ export default function DecomposeFlow() {
   }, [currentItem]);
 
   const currentChildren = currentItemId ? getChildItems(currentItemId) : [];
-  const currentDepth = currentItemId ? getItemDepth(currentItemId) : 0;
-  const atMaxDepth = currentDepth >= 2; // Max depth is 3, so parent at depth 2 is the limit
 
   // ── Handlers ──
 
@@ -126,16 +124,9 @@ export default function DecomposeFlow() {
     if (!childId) return;
 
     if (action === 'deeper') {
-      if (atMaxDepth) {
-        // Can't go deeper — mark atomic instead
-        markAtomic(childId);
-        setAtomicIds(prev => [...prev, childId]);
-        advanceToNextChild();
-      } else {
-        // Push onto stack and decompose this child
-        setDecomposeStack(prev => [...prev, childId]);
-        setStep('decompose');
-      }
+      // Push onto stack and decompose this child
+      setDecomposeStack(prev => [...prev, childId]);
+      setStep('decompose');
     } else {
       // Mark as atomic, go to classification
       markAtomic(childId);
@@ -334,23 +325,27 @@ export default function DecomposeFlow() {
               )}
 
               {/* Suggestions */}
-              {subSuggestions.length > 0 && (
-                <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
-                  {subSuggestions.map(sub => {
-                    const w = dimensionsToWeight(sub.dimensions);
-                    return (
-                      <button
-                        key={sub.name}
-                        onClick={() => addSuggestion(sub)}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
-                      >
-                        <span className="text-sm text-white">{sub.name}</span>
-                        <span className="text-xs text-slate-500 font-mono shrink-0 ml-2">{w}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {(() => {
+                const addedNames = new Set(currentChildren.map(c => c.name.toLowerCase()));
+                const remaining = subSuggestions.filter(s => !addedNames.has(s.name.toLowerCase()));
+                return remaining.length > 0 ? (
+                  <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
+                    {remaining.map(sub => {
+                      const w = dimensionsToWeight(sub.dimensions);
+                      return (
+                        <button
+                          key={sub.name}
+                          onClick={() => addSuggestion(sub)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
+                        >
+                          <span className="text-sm text-white">{sub.name}</span>
+                          <span className="text-xs text-slate-500 font-mono shrink-0 ml-2">{w}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null;
+              })()}
 
               {/* Custom input */}
               <div className="flex gap-2">
@@ -408,7 +403,7 @@ export default function DecomposeFlow() {
                   <Layers size={20} className="text-amber-400 mb-2" />
                   <span className="text-sm text-white font-medium block">Yes, unpack it</span>
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    {atMaxDepth ? 'Max depth reached — will mark as atomic' : 'Break it into smaller pieces'}
+                    Break it into smaller pieces
                   </span>
                 </button>
                 <button
