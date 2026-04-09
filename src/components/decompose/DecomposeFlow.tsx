@@ -81,6 +81,10 @@ export default function DecomposeFlow() {
   };
 
   const addSuggestion = (sub: SubItemSuggestion) => {
+    if (!currentItemId) return;
+    // Prevent duplicates — check store directly for fresh children
+    const existingChildren = getChildItems(currentItemId);
+    if (existingChildren.some(c => c.name.toLowerCase() === sub.name.toLowerCase())) return;
     const w = dimensionsToWeight(sub.dimensions);
     addSubItem(
       sub.name,
@@ -92,7 +96,10 @@ export default function DecomposeFlow() {
   };
 
   const addCustom = () => {
-    if (!customText.trim() || !currentItem) return;
+    if (!customText.trim() || !currentItem || !currentItemId) return;
+    // Prevent duplicates
+    const existingChildren = getChildItems(currentItemId);
+    if (existingChildren.some(c => c.name.toLowerCase() === customText.trim().toLowerCase())) return;
     addSubItem(customText.trim(), currentItem.compartment, 5, 5);
     setCustomText('');
   };
