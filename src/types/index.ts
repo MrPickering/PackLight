@@ -22,7 +22,7 @@ export const DEFAULT_CONTEXTS: LifeContext[] = [
 ];
 
 export type GuidedPromptType = 'item' | 'pattern' | 'milestone';
-export type FirstStepsStep = 0 | 1 | 2 | 3 | 4;
+export type FirstStepsStep = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface GuidedPrompt {
   id: string;
@@ -36,6 +36,13 @@ export interface GuidedPrompt {
     actionType?: 'navigate' | 'openItem' | 'recoveryCheckIn';
   };
   dismissKey: string;
+}
+
+export interface ItemClassification {
+  what: string;       // "What is this thing?"
+  how: string;        // "How does it affect your daily life?"
+  why: string;        // "Why does it weigh on you?"
+  classifiedAt: string;
 }
 
 export interface NextStep {
@@ -89,6 +96,8 @@ export interface PackItem {
   originalUtility: number;
   weightDimensions?: WeightDimensions;
   contexts: string[];
+  classification?: ItemClassification;
+  isAtomic?: boolean;
   metadata?: Record<string, unknown>;
   sourceRef?: string;
 }

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Layers, Atom, Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
+
+const TOTAL_STEPS = 4;
 
 export default function FirstSteps() {
   const profile = usePackStore(s => s.profile);
   const items = usePackStore(s => s.items);
   const getActiveItems = usePackStore(s => s.getActiveItems);
   const getChildItems = usePackStore(s => s.getChildItems);
+  const getAtomicItems = usePackStore(s => s.getAtomicItems);
   const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const updateItem = usePackStore(s => s.updateItem);
   const advanceFirstStep = usePackStore(s => s.advanceFirstStep);
@@ -21,16 +24,24 @@ export default function FirstSteps() {
   const onboardingItems = active.filter(i => i.tags.includes('onboarding'));
   const firstItem = onboardingItems[0] ?? active[0];
 
-  // Track context selection for step 2
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
 
-  // Auto-detect step 1 completion: user has unpacked an item (container with 2+ children)
+  // Auto-detect step 1 completion: user has decomposed an item (container with 2+ children)
   useEffect(() => {
     if (step === 1) {
       const hasUnpacked = active.some(i => i.isContainer && getChildItems(i.id).length >= 2);
       if (hasUnpacked) advanceFirstStep();
     }
   }, [step, active, getChildItems, advanceFirstStep]);
+
+  // Auto-detect step 2 completion: user has classified an atomic item
+  useEffect(() => {
+    if (step === 2) {
+      const atomics = getAtomicItems();
+      const hasClassified = atomics.some(i => i.classification);
+      if (hasClassified) advanceFirstStep();
+    }
+  }, [step, getAtomicItems, advanceFirstStep]);
 
   const balance = getLoadBalance();
 
@@ -41,11 +52,15 @@ export default function FirstSteps() {
     advanceFirstStep();
   };
 
+  // Map internal step numbers to display step (steps 0 and 1 share visual step 1)
+  const displayStep = step <= 1 ? 1 : step;
+
   return (
     <div className="max-w-lg mx-auto space-y-6">
+      {/* Progress bar */}
       <div className="flex gap-1">
-        {[1, 2, 3].map(i => (
-          <div key={i} className={`h-1 flex-1 rounded-full ${step >= i ? 'bg-amber-500' : 'bg-slate-800'}`} />
+        {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+          <div key={i} className={`h-1 flex-1 rounded-full ${displayStep >= i + 1 ? 'bg-amber-500' : 'bg-slate-800'}`} />
         ))}
       </div>
 
@@ -58,37 +73,51 @@ export default function FirstSteps() {
           transition={{ duration: 0.2 }}
           className="space-y-5"
         >
-          {/* Step 0/1: Unpack your first item */}
+          {/* Step 1: Decompose your first item */}
           {(step === 0 || step === 1) && (
             <>
               <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-white">First, let's look deeper</h2>
+                <div className="flex items-center gap-2">
+                  <Layers size={18} className="text-violet-400" />
+                  <h2 className="text-xl font-semibold text-white">Break it down</h2>
+                </div>
                 {firstItem ? (
                   <p className="text-sm text-slate-400">
-                    You mentioned '<span className="text-white">{firstItem.name}</span>'. There's probably more to it.
-                    Tap it to see what's inside.
+                    You mentioned '<span className="text-white">{firstItem.name}</span>'. Most things we carry aren't one thing — they're made up of smaller pieces.
                   </p>
                 ) : (
                   <p className="text-sm text-slate-400">
-                    Add your first item, then we'll unpack it together.
+                    Add your first item, then we'll break it down together.
                   </p>
                 )}
               </div>
 
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-start gap-3 text-sm text-slate-400">
+                  <span className="text-amber-400 font-mono text-lg leading-none shrink-0">1</span>
+                  <p><span className="text-white">Decompose</span> — break big items into the pieces that actually make them heavy</p>
+                </div>
+                <div className="flex items-start gap-3 text-sm text-slate-400">
+                  <span className="text-amber-400 font-mono text-lg leading-none shrink-0">2</span>
+                  <p><span className="text-white">Go deeper</span> — keep breaking down until you reach things that can't be split further (atomic items)</p>
+                </div>
+                <div className="flex items-start gap-3 text-sm text-slate-400">
+                  <span className="text-amber-400 font-mono text-lg leading-none shrink-0">3</span>
+                  <p><span className="text-white">Classify</span> — for each atomic piece, understand what it is, how it affects you, and why it weighs on you</p>
+                </div>
+              </div>
+
               {firstItem && (
                 <button
-                  onClick={() => navigate(`/pack/${firstItem.compartment}`, {
-                    state: { highlightItemId: firstItem.id },
-                  })}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors"
+                  onClick={() => navigate(`/decompose/${firstItem.id}`)}
+                  className="w-full py-3 bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-xl text-sm font-semibold hover:bg-violet-500/30 transition-colors flex items-center justify-center gap-2"
                 >
-                  <div className="text-white font-medium">{firstItem.name}</div>
-                  <div className="text-xs text-slate-500 mt-1">Weight: {firstItem.weight} — Tap to unpack what's inside</div>
+                  <Layers size={16} /> Decompose '{firstItem.name}' <ArrowRight size={16} />
                 </button>
               )}
 
               <p className="text-xs text-slate-600">
-                Add 2+ sub-items to continue. Most things we carry aren't one thing.
+                The decompose flow will guide you through each step. Add 2+ sub-items to continue.
               </p>
 
               <button
@@ -100,8 +129,73 @@ export default function FirstSteps() {
             </>
           )}
 
-          {/* Step 2: Tag with context */}
+          {/* Step 2: Classify an atomic item */}
           {step === 2 && (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Atom size={18} className="text-emerald-400" />
+                  <h2 className="text-xl font-semibold text-white">Classify what you found</h2>
+                </div>
+                <p className="text-sm text-slate-400">
+                  Now that you've broken things down, classify the atomic pieces. For each one, answer three questions:
+                </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-400 font-medium text-sm shrink-0">What</span>
+                  <p className="text-sm text-slate-400">What is this thing, in your own words?</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-400 font-medium text-sm shrink-0">How</span>
+                  <p className="text-sm text-slate-400">How does it affect your daily life?</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-400 font-medium text-sm shrink-0">Why</span>
+                  <p className="text-sm text-slate-400">Why does it weigh on you?</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500">
+                Classification helps you understand the real nature of what you carry. It turns vague weight into something you can work with.
+              </p>
+
+              {(() => {
+                const atomics = getAtomicItems();
+                const unclassified = atomics.filter(i => !i.classification);
+                const firstUnclassified = unclassified[0];
+                if (firstUnclassified) {
+                  return (
+                    <button
+                      onClick={() => navigate(`/decompose/${firstUnclassified.id}`)}
+                      className="w-full py-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-sm font-semibold hover:bg-emerald-500/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Atom size={16} /> Classify '{firstUnclassified.name}' <ArrowRight size={16} />
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => navigate('/decompose')}
+                    className="w-full py-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-sm font-semibold hover:bg-emerald-500/30 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Atom size={16} /> Open Decompose Flow <ArrowRight size={16} />
+                  </button>
+                );
+              })()}
+
+              <button
+                onClick={advanceFirstStep}
+                className="text-xs text-slate-600 hover:text-slate-400"
+              >
+                Skip this step
+              </button>
+            </>
+          )}
+
+          {/* Step 3: Tag with context + connections teaser */}
+          {step === 3 && (
             <>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold text-white">When does this weigh on you?</h2>
@@ -134,6 +228,17 @@ export default function FirstSteps() {
                 Contexts let you filter your view — carry only what's relevant right now.
               </p>
 
+              {/* Connections teaser */}
+              <div className="bg-slate-900 border border-violet-500/20 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-violet-300">
+                  <Link2 size={14} />
+                  <span className="font-medium">Connections are automatic</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  As you add tags, contexts, and items across compartments, PackLight discovers relationships between them. Check the Connections tab in Trail Map to see what surfaces.
+                </p>
+              </div>
+
               <div className="flex gap-3">
                 <button
                   onClick={handleContextSave}
@@ -145,8 +250,8 @@ export default function FirstSteps() {
             </>
           )}
 
-          {/* Step 3: Check your balance */}
-          {step === 3 && (
+          {/* Step 4: Check your balance */}
+          {step === 4 && (
             <>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold text-white">Your Load Balance</h2>
@@ -168,8 +273,18 @@ export default function FirstSteps() {
                 </motion.span>
                 <span className="text-xs text-slate-500 block mt-2">out of 100</span>
                 <p className="text-sm text-slate-400 mt-4">
-                  Higher = more sustainable. This updates as you add items, unpack them, and check in on recovery.
+                  Higher = more sustainable. This updates as you decompose items, classify them, and check in on recovery.
                 </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                <span className="text-xs text-amber-400 font-medium">Your ongoing loop</span>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                  <div className="flex items-center gap-1.5"><Layers size={12} className="text-violet-400 shrink-0" /> Decompose heavy items</div>
+                  <div className="flex items-center gap-1.5"><Atom size={12} className="text-emerald-400 shrink-0" /> Classify atomic pieces</div>
+                  <div className="flex items-center gap-1.5"><Link2 size={12} className="text-blue-400 shrink-0" /> Discover connections</div>
+                  <div className="flex items-center gap-1.5"><ArrowRight size={12} className="text-amber-400 shrink-0" /> Weekly check-ins</div>
+                </div>
               </div>
 
               <button
@@ -183,7 +298,7 @@ export default function FirstSteps() {
         </motion.div>
       </AnimatePresence>
 
-      {step < 3 && (
+      {step < 4 && (
         <button
           onClick={completeFirstSteps}
           className="block text-xs text-slate-600 hover:text-slate-400 text-center w-full"

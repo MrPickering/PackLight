@@ -1,70 +1,90 @@
 import { useState, useMemo } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Feather } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Feather, ExternalLink, Layers, Atom } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { usePackStore } from '../../store';
-import { AGENTS, TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
+import { TERRAIN_META, COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { TerrainType, PackItem } from '../../types';
 import { calculateLoadBalance } from '../../utils/loadBalance';
 import { useDisplayMode } from '../shared/DisplayModeProvider';
 import ReleaseRitualModal from '../items/ReleaseRitualModal';
 
-type Step = 'review' | 'briefing' | 'triage' | 'terrain' | 'summary';
-const STEPS: Step[] = ['review', 'briefing', 'triage', 'terrain', 'summary'];
+type Step = 'review' | 'stuck' | 'classify' | 'terrain' | 'summary';
+const STEPS: Step[] = ['review', 'stuck', 'classify', 'terrain', 'summary'];
 const STEP_LABELS: Record<Step, string> = {
-  review: 'Review Changes',
-  briefing: 'Agent Briefing',
-  triage: 'Triage Items',
-  terrain: 'Terrain Check',
+  review: 'Review All',
+  stuck: 'Stuck Items',
+  classify: 'Quick Classify',
+  terrain: 'Terrain',
   summary: 'Summary',
 };
 
 export default function RepackMode() {
+  const navigate = useNavigate();
   const items = usePackStore(s => s.items);
   const agentNotes = usePackStore(s => s.agentNotes);
   const profile = usePackStore(s => s.profile);
   const setTerrain = usePackStore(s => s.setTerrain);
-  const updateItem = usePackStore(s => s.updateItem);
   const dropItem = usePackStore(s => s.dropItem);
   const setLighteningApproach = usePackStore(s => s.setLighteningApproach);
   const setNextStep = usePackStore(s => s.setNextStep);
-  const completeNextStep = usePackStore(s => s.completeNextStep);
+  const classifyItem = usePackStore(s => s.classifyItem);
+  const displayConfig = useDisplayMode();
 
   const [step, setStep] = useState<Step>('review');
-  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
-  const [triageActions, setTriageActions] = useState<Record<string, 'keep' | 'drop' | 'lighten'>>({});
+  const [triageActions, setTriageActions] = useState<Record<string, 'keep' | 'drop' | 'lighten' | 'decompose'>>({});
   const [lightenExpanded, setLightenExpanded] = useState<string | null>(null);
   const [triageNextStep, setTriageNextStep] = useState<Record<string, string>>({});
   const [releaseQueue, setReleaseQueue] = useState<PackItem[]>([]);
   const [currentReleaseItem, setCurrentReleaseItem] = useState<PackItem | null>(null);
-  const displayConfig = useDisplayMode();
 
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  // Quick classify state
+  const [classifyIndex, setClassifyIndex] = useState(0);
+  const [classWhat, setClassWhat] = useState('');
+  const [classHow, setClassHow] = useState('');
+  const [classWhy, setClassWhy] = useState('');
+  const [classifiedCount, setClassifiedCount] = useState(0);
 
-  const recentlyChanged = items.filter(
-    i => !i.droppedAt && new Date(i.updatedAt) >= weekAgo,
-  );
-
-  const flaggedItems = useMemo(() => {
-    const flaggedIds = new Set(
-      agentNotes.filter(n => n.status === 'pending').flatMap(n => n.relatedItemIds),
-    );
-    return items.filter(i => !i.droppedAt && flaggedIds.has(i.id));
-  }, [agentNotes, items]);
-
-  const agentBriefings = useMemo(() => {
-    const byAgent = new Map<string, typeof agentNotes>();
-    agentNotes.filter(n => n.status === 'pending').forEach(n => {
-      if (!byAgent.has(n.agentId)) byAgent.set(n.agentId, []);
-      byAgent.get(n.agentId)!.push(n);
-    });
-    return byAgent;
-  }, [agentNotes]);
-
+  const activeItems = items.filter(i => !i.droppedAt);
   const recoveryHistory = profile.recoveryHistory ?? [];
   const initialScore = calculateLoadBalance(items, profile.currentTerrain, recoveryHistory).score;
 
-  const handleTriage = (itemId: string, action: 'keep' | 'drop' | 'lighten') => {
+  // Review: ALL items grouped by compartment
+  const itemsByCompartment = useMemo(() => {
+    const groups = new Map<string, PackItem[]>();
+    for (const item of activeItems.filter(i => !i.parentId)) {
+      const comp = item.compartment;
+      if (!groups.has(comp)) groups.set(comp, []);
+      groups.get(comp)!.push(item);
+    }
+    return groups;
+  }, [activeItems]);
+
+  // Stuck items: weight stable 2+ weeks, no lightening strategy, or agent-flagged
+  const stuckItems = useMemo(() => {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+    const flaggedIds = new Set(
+      agentNotes.filter(n => n.status === 'pending').flatMap(n => n.relatedItemIds),
+    );
+
+    return activeItems.filter(item => {
+      if (item.parentId) return false;
+      const isStale = new Date(item.updatedAt) < twoWeeksAgo;
+      const noStrategy = item.weight > item.utility && !item.lighteningApproach;
+      const isFlagged = flaggedIds.has(item.id);
+      return isStale || noStrategy || isFlagged;
+    });
+  }, [activeItems, agentNotes]);
+
+  // Unclassified atomic items
+  const unclassifiedAtomic = useMemo(
+    () => activeItems.filter(i => i.isAtomic && !i.classification),
+    [activeItems],
+  );
+
+  const handleTriage = (itemId: string, action: 'keep' | 'drop' | 'lighten' | 'decompose') => {
     setTriageActions(prev => ({ ...prev, [itemId]: action }));
     if (action === 'lighten') {
       setLightenExpanded(itemId);
@@ -94,6 +114,23 @@ export default function RepackMode() {
     }
   };
 
+  const handleQuickClassify = () => {
+    const item = unclassifiedAtomic[classifyIndex];
+    if (item && (classWhat.trim() || classHow.trim() || classWhy.trim())) {
+      classifyItem(item.id, {
+        what: classWhat.trim(),
+        how: classHow.trim(),
+        why: classWhy.trim(),
+        classifiedAt: new Date().toISOString(),
+      });
+      setClassifiedCount(prev => prev + 1);
+    }
+    setClassWhat('');
+    setClassHow('');
+    setClassWhy('');
+    setClassifyIndex(prev => prev + 1);
+  };
+
   const finalScore = useMemo(() => {
     const simulated = items.map(i => {
       if (triageActions[i.id] === 'drop') return { ...i, droppedAt: 'simulated' };
@@ -105,23 +142,27 @@ export default function RepackMode() {
   const stepIndex = STEPS.indexOf(step);
 
   const goNext = () => {
-    if (step === 'triage') applyTriage();
+    if (step === 'stuck') applyTriage();
     if (stepIndex < STEPS.length - 1) setStep(STEPS[stepIndex + 1]);
+  };
+
+  const goBack = () => {
+    if (stepIndex > 0) setStep(STEPS[stepIndex - 1]);
   };
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <h1 className="text-xl font-semibold text-white">Weekly Repack</h1>
+      <h1 className="text-xl font-semibold text-white">Weekly Check-in</h1>
 
       {/* Progress */}
       <div className="flex gap-1">
         {STEPS.map((s, i) => (
-          <div key={s} className="flex-1">
+          <button key={s} onClick={() => i < stepIndex && setStep(s)} className="flex-1">
             <div className={`h-1 rounded-full ${i <= stepIndex ? 'bg-amber-500' : 'bg-slate-800'}`} />
             <span className={`text-[10px] mt-1 block ${i === stepIndex ? 'text-amber-400' : 'text-slate-600'}`}>
               {STEP_LABELS[s]}
             </span>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -133,80 +174,50 @@ export default function RepackMode() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
         >
+          {/* ── Review All ── */}
           {step === 'review' && (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-400">Items that changed this week:</p>
-              {recentlyChanged.length > 0 ? (
-                recentlyChanged.map(item => (
-                  <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-sm text-white">{item.name}</span>
-                      <span className="text-xs text-slate-500 ml-2">{COMPARTMENT_META[item.compartment].emoji}</span>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-400">Everything in your pack right now:</p>
+              {Array.from(itemsByCompartment.entries()).map(([comp, compItems]) => {
+                const meta = COMPARTMENT_META[comp as keyof typeof COMPARTMENT_META];
+                return (
+                  <div key={comp} className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{meta.emoji}</span>
+                      <span className="text-xs font-medium text-slate-400">{meta.label}</span>
+                      <span className="text-[10px] text-slate-600">{compItems.length}</span>
                     </div>
-                    <div className="flex gap-2 text-xs font-mono">
-                      <span className="text-rose-400">W:{item.weight}</span>
-                      <span className="text-emerald-400">U:{item.utility}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-600 italic py-6 text-center">No items changed this week. Your pack has been stable.</p>
-              )}
-            </div>
-          )}
-
-          {step === 'briefing' && (
-            <div className="space-y-2">
-              <p className="text-sm text-slate-400">Your agents have observations to share:</p>
-              {agentBriefings.size > 0 ? (
-                Array.from(agentBriefings.entries()).map(([agentId, notes]) => {
-                  const agent = AGENTS[agentId as keyof typeof AGENTS];
-                  const isExpanded = expandedAgent === agentId;
-                  return (
-                    <div key={agentId} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                      <button
-                        onClick={() => setExpandedAgent(isExpanded ? null : agentId)}
-                        className="w-full p-4 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{agent.emoji}</span>
-                          <span className="text-sm font-medium text-white">{agent.name}</span>
-                          <span className="text-[10px] text-slate-500">{notes.length} notes</span>
+                    {compItems.map(item => (
+                      <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm text-white truncate">{item.name}</span>
+                          {item.isAtomic && <Atom size={10} className="text-emerald-400 shrink-0" />}
+                          {item.isContainer && <Layers size={10} className="text-amber-400 shrink-0" />}
+                          {item.classification && (
+                            <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-1 rounded shrink-0">classified</span>
+                          )}
                         </div>
-                        {isExpanded ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
-                      </button>
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: 'auto' }}
-                            exit={{ height: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="px-4 pb-4 space-y-2">
-                              {notes.slice(0, 3).map(note => (
-                                <p key={note.id} className="text-sm text-slate-400 bg-slate-800/50 rounded-lg p-2.5">
-                                  {note.content}
-                                </p>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-slate-600 italic py-6 text-center">Your agents are quiet this week. All clear.</p>
+                        <div className="flex gap-2 text-xs font-mono shrink-0 ml-2">
+                          <span className="text-rose-400">W:{item.weight}</span>
+                          <span className="text-emerald-400">U:{item.utility}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {activeItems.length === 0 && (
+                <p className="text-sm text-slate-600 italic py-6 text-center">Your pack is empty.</p>
               )}
             </div>
           )}
 
-          {step === 'triage' && (
+          {/* ── Stuck Items ── */}
+          {step === 'stuck' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-400">Items flagged by your agents. Decide their fate:</p>
-              {flaggedItems.length > 0 ? (
-                flaggedItems.map(item => (
+              <p className="text-sm text-slate-400">Items that are stale, unstrategized, or flagged by agents:</p>
+              {stuckItems.length > 0 ? (
+                stuckItems.map(item => (
                   <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-white font-medium">{item.name}</span>
@@ -215,6 +226,7 @@ export default function RepackMode() {
                     <div className="flex gap-2 text-xs font-mono mb-3">
                       <span className="text-rose-400">W:{item.weight}</span>
                       <span className="text-emerald-400">U:{item.utility}</span>
+                      <span className="text-slate-600">Updated {new Date(item.updatedAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -247,6 +259,21 @@ export default function RepackMode() {
                       >
                         Drop
                       </button>
+                      {!item.isContainer && !item.isAtomic && (
+                        <button
+                          onClick={() => {
+                            handleTriage(item.id, 'decompose');
+                            navigate(`/decompose/${item.id}`);
+                          }}
+                          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                            triageActions[item.id] === 'decompose'
+                              ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          <Layers size={10} /> Unpack
+                        </button>
+                      )}
                     </div>
 
                     {/* Inline lightening panel */}
@@ -321,11 +348,78 @@ export default function RepackMode() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-600 italic py-6 text-center">Nothing flagged for triage. Your pack is in good shape.</p>
+                <p className="text-sm text-slate-600 italic py-6 text-center">Nothing stuck. Your pack is in good shape.</p>
               )}
             </div>
           )}
 
+          {/* ── Quick Classify ── */}
+          {step === 'classify' && (
+            <div className="space-y-4">
+              {classifyIndex < unclassifiedAtomic.length ? (
+                (() => {
+                  const item = unclassifiedAtomic[classifyIndex];
+                  return (
+                    <>
+                      <p className="text-xs text-slate-500">
+                        {classifyIndex + 1} of {unclassifiedAtomic.length} unclassified atomic items
+                      </p>
+                      <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{COMPARTMENT_META[item.compartment].emoji}</span>
+                          <span className="text-white font-medium">{item.name}</span>
+                          <Atom size={12} className="text-emerald-400" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs text-amber-400 mb-1.5">What is this?</label>
+                          <input type="text" value={classWhat} onChange={e => setClassWhat(e.target.value)}
+                            placeholder="In your own words..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-amber-400 mb-1.5">How does it affect your daily life?</label>
+                          <input type="text" value={classHow} onChange={e => setClassHow(e.target.value)}
+                            placeholder="What does it do to your days..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-amber-400 mb-1.5">Why does it weigh on you?</label>
+                          <input type="text" value={classWhy} onChange={e => setClassWhy(e.target.value)}
+                            placeholder="The root of its weight..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50" />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={handleQuickClassify}
+                          className="flex-1 py-2.5 bg-slate-800 text-slate-400 rounded-lg text-sm hover:bg-slate-700 transition-colors">
+                          Skip
+                        </button>
+                        <button onClick={handleQuickClassify}
+                          className="flex-1 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors">
+                          Save & Next
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()
+              ) : (
+                <div className="text-center py-8 space-y-3">
+                  <Atom size={32} className="text-emerald-400 mx-auto" />
+                  <p className="text-sm text-slate-400">
+                    {unclassifiedAtomic.length === 0
+                      ? 'All atomic items are classified. Nice work.'
+                      : `Done! Classified ${classifiedCount} item${classifiedCount !== 1 ? 's' : ''} this session.`}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Terrain ── */}
           {step === 'terrain' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-400">How does life feel now?</p>
@@ -352,6 +446,7 @@ export default function RepackMode() {
             </div>
           )}
 
+          {/* ── Summary ── */}
           {step === 'summary' && (
             <div className="text-center py-8 space-y-6">
               <div className="space-y-2">
@@ -375,30 +470,56 @@ export default function RepackMode() {
                   </div>
                 </div>
               </div>
-              {Object.values(triageActions).filter(a => a === 'drop').length > 0 && (
-                <p className="text-emerald-400 text-sm">
-                  You let go of {Object.values(triageActions).filter(a => a === 'drop').length} item(s). That's lighter already.
-                </p>
-              )}
-              {Object.values(triageActions).filter(a => a === 'lighten').length > 0 && (
-                <p className="text-amber-400 text-sm">
-                  You're actively lightening {Object.values(triageActions).filter(a => a === 'lighten').length} item(s). Small steps add up.
-                </p>
-              )}
-              {(() => {
-                const weekAgoDate = new Date();
-                weekAgoDate.setDate(weekAgoDate.getDate() - 7);
-                const stepsThisWeek = items.reduce((total, item) =>
-                  total + (item.completedSteps || []).filter(s => new Date(s.completedAt) >= weekAgoDate).length, 0);
-                return stepsThisWeek > 0 ? (
-                  <p className="text-violet-400 text-sm">
-                    {stepsThisWeek} lightening step{stepsThisWeek !== 1 ? 's' : ''} completed this week.
+
+              {/* Session stats */}
+              <div className="space-y-2 text-sm">
+                {Object.values(triageActions).filter(a => a === 'drop').length > 0 && (
+                  <p className="text-emerald-400">
+                    Released {Object.values(triageActions).filter(a => a === 'drop').length} item(s).
                   </p>
+                )}
+                {Object.values(triageActions).filter(a => a === 'lighten').length > 0 && (
+                  <p className="text-amber-400">
+                    Lightening {Object.values(triageActions).filter(a => a === 'lighten').length} item(s).
+                  </p>
+                )}
+                {classifiedCount > 0 && (
+                  <p className="text-violet-400">
+                    Classified {classifiedCount} item{classifiedCount !== 1 ? 's' : ''}.
+                  </p>
+                )}
+              </div>
+
+              {/* Active next steps */}
+              {(() => {
+                const itemsWithSteps = activeItems.filter(i => i.nextStep && !i.nextStep.completedAt);
+                return itemsWithSteps.length > 0 ? (
+                  <div className="text-left max-w-sm mx-auto space-y-1.5">
+                    <span className="text-[10px] text-amber-400 uppercase tracking-wider">Active Next Steps</span>
+                    {itemsWithSteps.map(item => (
+                      <div key={item.id} className="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center gap-2">
+                        <span className="text-xs">{COMPARTMENT_META[item.compartment].emoji}</span>
+                        <span className="text-xs text-slate-300 truncate">{item.nextStep!.text}</span>
+                      </div>
+                    ))}
+                  </div>
                 ) : null;
               })()}
+
               <p className="text-slate-500 text-sm max-w-md mx-auto">
-                Every repack is a chance to carry only what serves you. Not everything needs dropping — some things just need lightening. Keep going.
+                Every check-in is a chance to carry only what serves you. Keep going.
               </p>
+
+              {/* Coach-mark.ai CTA */}
+              <a
+                href="https://coach-mark.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-amber-400 transition-colors"
+              >
+                <ExternalLink size={12} /> Want deeper support? Try coach-mark.ai
+              </a>
+
               <Check size={32} className="text-amber-500 mx-auto" />
             </div>
           )}
@@ -407,15 +528,26 @@ export default function RepackMode() {
 
       {/* Navigation */}
       {step !== 'summary' && (
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          {stepIndex > 0 ? (
+            <button
+              onClick={goBack}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm hover:bg-slate-700 transition-colors"
+            >
+              <ArrowLeft size={16} /> Back
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={goNext}
             className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
           >
-            {step === 'terrain' ? 'Finish Repack' : 'Next'} <ArrowRight size={16} />
+            {step === 'terrain' ? 'Finish' : 'Next'} <ArrowRight size={16} />
           </button>
         </div>
       )}
+
       {currentReleaseItem && (
         <ReleaseRitualModal
           item={currentReleaseItem}

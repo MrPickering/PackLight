@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Target, TrendingDown } from 'lucide-react';
+import { Target, TrendingDown, Link2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { motion } from 'framer-motion';
 import { usePackStore } from '../../store';
@@ -7,6 +7,7 @@ import { TERRAIN_META, COMPARTMENT_META } from '../../types';
 import type { TerrainType } from '../../types';
 import WeightUtilityBar from '../shared/WeightUtilityBar';
 import { useDisplayMode } from '../shared/DisplayModeProvider';
+import ConnectionsView from '../connections/ConnectionsView';
 
 const TERRAINS: TerrainType[] = ['summit', 'downhill', 'camp', 'uphill', 'ridge', 'swamp'];
 const RANGE_OPTIONS = [
@@ -15,6 +16,8 @@ const RANGE_OPTIONS = [
   { label: '1y', days: 365 },
 ];
 
+type Tab = 'journey' | 'connections';
+
 export default function TrailMap() {
   const profile = usePackStore(s => s.profile);
   const setTerrain = usePackStore(s => s.setTerrain);
@@ -22,6 +25,7 @@ export default function TrailMap() {
   const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
   const displayConfig = useDisplayMode();
   const [range, setRange] = useState(30);
+  const [tab, setTab] = useState<Tab>('journey');
 
   const maps = getCompartmentItems('maps');
   const droppedItems = items.filter(i => !!i.droppedAt).sort((a, b) =>
@@ -44,6 +48,29 @@ export default function TrailMap() {
     <div className="space-y-8 pb-20 md:pb-0">
       <h1 className="text-xl font-semibold text-white">Trail Map</h1>
 
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
+        <button
+          onClick={() => setTab('journey')}
+          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+            tab === 'journey' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <Target size={14} /> Journey
+        </button>
+        <button
+          onClick={() => setTab('connections')}
+          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+            tab === 'connections' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <Link2 size={14} /> Connections
+        </button>
+      </div>
+
+      {tab === 'connections' && <ConnectionsView />}
+
+      {tab === 'journey' && <>
       {/* Goals */}
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-slate-400 flex items-center gap-2">
@@ -198,6 +225,7 @@ export default function TrailMap() {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }
