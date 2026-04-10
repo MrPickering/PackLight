@@ -110,19 +110,27 @@ export default function DecomposeFlow() {
       name: customText.trim(),
       compartment: currentItem.compartment,
       utility: 5,
-      dimensions: { stress: 1, worry: 1, cognitive: 1, urgency: 1, emotional: 1 },
+      dimensions: { stress: 0, worry: 0, cognitive: 0, urgency: 0, emotional: 0 },
     });
     setCustomText('');
   };
 
   const setPendingDimension = (key: keyof WeightDimensions, value: number) => {
-    setPendingItem(p => p ? { ...p, dimensions: { ...p.dimensions, [key]: value } } : p);
+    setPendingItem(p => {
+      if (!p) return p;
+      // Toggle: tapping the active value deselects the dimension
+      const newVal = p.dimensions[key] === value ? 0 : value;
+      return { ...p, dimensions: { ...p.dimensions, [key]: newVal } };
+    });
   };
 
   const confirmPending = () => {
     if (!pendingItem) return;
-    const w = dimensionsToWeight(pendingItem.dimensions);
-    addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, pendingItem.dimensions);
+    const dims = pendingItem.dimensions;
+    const hasAny = DIMENSION_KEYS.some(k => dims[k] > 0);
+    // Default to weight 3 if no dimensions rated
+    const w = hasAny ? dimensionsToWeight(dims) : 3;
+    addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, hasAny ? dims : undefined);
     setPendingItem(null);
   };
 
@@ -356,52 +364,59 @@ export default function DecomposeFlow() {
               )}
 
               {/* Dimension rating for pending item */}
-              {pendingItem && (
-                <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-white font-medium">{pendingItem.name}</span>
-                    <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
+              {pendingItem && (() => {
+                const activeCount = DIMENSION_KEYS.filter(k => pendingItem.dimensions[k] > 0).length;
+                const computedWeight = activeCount > 0 ? dimensionsToWeight(pendingItem.dimensions) : 3;
+                return (
+                  <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white font-medium">{pendingItem.name}</span>
+                      <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      How does this affect you? Rate only what's relevant. <span className="text-slate-400">1 = barely, 5 = overwhelming.</span>
+                    </p>
+                    <div className="space-y-2">
+                      {DIMENSION_KEYS.map(key => {
+                        const val = pendingItem.dimensions[key];
+                        const isActive = val > 0;
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            <div className="w-20 shrink-0">
+                              <span className={`text-xs ${isActive ? 'text-slate-300' : 'text-slate-600'}`}>
+                                {DIMENSION_LABELS[key].label}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 flex-1">
+                              {[1, 2, 3, 4, 5].map(v => (
+                                <button
+                                  key={v}
+                                  onClick={() => setPendingDimension(key, v)}
+                                  className={`flex-1 h-8 rounded text-xs font-medium transition-colors ${
+                                    val === v
+                                      ? v >= 4 ? 'bg-rose-500 text-white' : v >= 3 ? 'bg-amber-500 text-slate-950' : 'bg-slate-600 text-white'
+                                      : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
+                                  }`}
+                                >
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={confirmPending}
+                      className="w-full py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
+                    >
+                      {activeCount > 0
+                        ? `Add — weight ${computedWeight}`
+                        : 'Add without rating'}
+                    </button>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Rate how this affects you. <span className="text-slate-400">1 = barely there, 5 = overwhelming.</span>
-                  </p>
-                  <div className="space-y-2">
-                    {DIMENSION_KEYS.map(key => (
-                      <div key={key} className="flex items-center gap-2">
-                        <div className="w-20 shrink-0">
-                          <span className="text-xs text-slate-400">{DIMENSION_LABELS[key].label}</span>
-                        </div>
-                        <div className="flex gap-1 flex-1">
-                          {[1, 2, 3, 4, 5].map(v => (
-                            <button
-                              key={v}
-                              onClick={() => setPendingDimension(key, v)}
-                              className={`flex-1 h-8 rounded text-xs font-medium transition-colors ${
-                                pendingItem.dimensions[key] === v
-                                  ? v >= 4 ? 'bg-rose-500 text-white' : v >= 3 ? 'bg-amber-500 text-slate-950' : 'bg-slate-600 text-white'
-                                  : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
-                              }`}
-                            >
-                              {v}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-slate-600">
-                      Combined weight: <span className="text-rose-400 font-mono">{dimensionsToWeight(pendingItem.dimensions)}</span>
-                    </span>
-                  </div>
-                  <button
-                    onClick={confirmPending}
-                    className="w-full py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
-                  >
-                    Add — weight {dimensionsToWeight(pendingItem.dimensions)}
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Suggestions */}
               {!pendingItem && (() => {
