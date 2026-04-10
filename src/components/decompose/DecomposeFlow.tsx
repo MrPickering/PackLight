@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, Layers, Atom, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
-import { COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
+import { COMPARTMENT_META, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
 import type { PackItem, Compartment, WeightDimensions } from '../../types';
-import { WEIGHT_PRESETS, TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
+import { TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
 import type { SubItemSuggestion } from '../../types/suggestions';
 
 type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'summary';
@@ -37,15 +37,15 @@ export default function DecomposeFlow() {
   const [classHow, setClassHow] = useState('');
   const [classWhy, setClassWhy] = useState('');
 
-  // Pending item — staged for weight personalization before adding
+  // Pending item — staged for dimension rating before adding
   const [pendingItem, setPendingItem] = useState<{
     name: string;
     compartment: Compartment;
     utility: number;
-    dimensions?: WeightDimensions;
-    baselineWeight: number;
-    personalWeight: number;
+    dimensions: WeightDimensions;
   } | null>(null);
+
+  const DIMENSION_KEYS: (keyof WeightDimensions)[] = ['stress', 'worry', 'cognitive', 'urgency', 'emotional'];
 
   // Summary tracking
   const [decomposedIds, setDecomposedIds] = useState<string[]>([]);
@@ -94,14 +94,11 @@ export default function DecomposeFlow() {
     if (!currentItemId) return;
     const existingChildren = getChildItems(currentItemId);
     if (existingChildren.some(c => c.name.toLowerCase() === sub.name.toLowerCase())) return;
-    const w = dimensionsToWeight(sub.dimensions);
     setPendingItem({
       name: sub.name,
       compartment: sub.compartment ?? currentItem?.compartment ?? 'stones',
       utility: sub.utility,
-      dimensions: sub.dimensions,
-      baselineWeight: w,
-      personalWeight: w,
+      dimensions: { ...sub.dimensions },
     });
   };
 
@@ -113,27 +110,19 @@ export default function DecomposeFlow() {
       name: customText.trim(),
       compartment: currentItem.compartment,
       utility: 5,
-      baselineWeight: 5,
-      personalWeight: 5,
+      dimensions: { stress: 1, worry: 1, cognitive: 1, urgency: 1, emotional: 1 },
     });
     setCustomText('');
   };
 
+  const setPendingDimension = (key: keyof WeightDimensions, value: number) => {
+    setPendingItem(p => p ? { ...p, dimensions: { ...p.dimensions, [key]: value } } : p);
+  };
+
   const confirmPending = () => {
     if (!pendingItem) return;
-    // Scale dimensions proportionally if user changed the weight
-    let dims = pendingItem.dimensions;
-    if (dims && pendingItem.personalWeight !== pendingItem.baselineWeight) {
-      const scale = pendingItem.personalWeight / Math.max(1, pendingItem.baselineWeight);
-      dims = {
-        stress: Math.max(1, Math.min(5, Math.round(dims.stress * scale))),
-        worry: Math.max(1, Math.min(5, Math.round(dims.worry * scale))),
-        cognitive: Math.max(1, Math.min(5, Math.round(dims.cognitive * scale))),
-        urgency: Math.max(1, Math.min(5, Math.round(dims.urgency * scale))),
-        emotional: Math.max(1, Math.min(5, Math.round(dims.emotional * scale))),
-      };
-    }
-    addSubItem(pendingItem.name, pendingItem.compartment, pendingItem.personalWeight, pendingItem.utility, dims);
+    const w = dimensionsToWeight(pendingItem.dimensions);
+    addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, pendingItem.dimensions);
     setPendingItem(null);
   };
 
@@ -366,51 +355,50 @@ export default function DecomposeFlow() {
                 </div>
               )}
 
-              {/* Weight personalization for pending item */}
+              {/* Dimension rating for pending item */}
               {pendingItem && (
                 <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-white font-medium">{pendingItem.name}</span>
                     <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
                   </div>
-                  <p className="text-xs text-slate-500">How heavy is this <span className="text-white">for you</span>?</p>
-                  <div className="flex gap-2">
-                    {WEIGHT_PRESETS.map(preset => (
-                      <button
-                        key={preset.value}
-                        onClick={() => setPendingItem(p => p ? { ...p, personalWeight: preset.value } : p)}
-                        className={`flex-1 py-2.5 rounded-lg text-center transition-colors ${
-                          pendingItem.personalWeight === preset.value
-                            ? 'bg-amber-500 text-slate-950'
-                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                        }`}
-                      >
-                        <span className="text-sm font-medium block">{preset.label}</span>
-                        <span className="text-[10px] block mt-0.5">{preset.description}</span>
-                      </button>
+                  <p className="text-xs text-slate-500">
+                    Rate how this affects you. <span className="text-slate-400">1 = barely there, 5 = overwhelming.</span>
+                  </p>
+                  <div className="space-y-2">
+                    {DIMENSION_KEYS.map(key => (
+                      <div key={key} className="flex items-center gap-2">
+                        <div className="w-20 shrink-0">
+                          <span className="text-xs text-slate-400">{DIMENSION_LABELS[key].label}</span>
+                        </div>
+                        <div className="flex gap-1 flex-1">
+                          {[1, 2, 3, 4, 5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setPendingDimension(key, v)}
+                              className={`flex-1 h-8 rounded text-xs font-medium transition-colors ${
+                                pendingItem.dimensions[key] === v
+                                  ? v >= 4 ? 'bg-rose-500 text-white' : v >= 3 ? 'bg-amber-500 text-slate-950' : 'bg-slate-600 text-white'
+                                  : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
+                              }`}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      value={pendingItem.personalWeight}
-                      onChange={e => setPendingItem(p => p ? { ...p, personalWeight: Number(e.target.value) } : p)}
-                      className="flex-1 accent-amber-500"
-                    />
-                    <span className="text-rose-400 font-mono text-sm w-6 text-right">{pendingItem.personalWeight}</span>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-slate-600">
+                      Combined weight: <span className="text-rose-400 font-mono">{dimensionsToWeight(pendingItem.dimensions)}</span>
+                    </span>
                   </div>
-                  {pendingItem.personalWeight !== pendingItem.baselineWeight && (
-                    <p className="text-[10px] text-slate-600">
-                      Baseline was {pendingItem.baselineWeight} — adjusted to {pendingItem.personalWeight}
-                    </p>
-                  )}
                   <button
                     onClick={confirmPending}
                     className="w-full py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
                   >
-                    Add at weight {pendingItem.personalWeight}
+                    Add — weight {dimensionsToWeight(pendingItem.dimensions)}
                   </button>
                 </div>
               )}
