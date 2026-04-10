@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, LIGHTENING_STRATEGIES } from '../../types';
 import type { PackItem, Compartment, WeightDimensions } from '../../types';
-import { TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
+import { WEIGHT_PRESETS, TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
 import type { SubItemSuggestion } from '../../types/suggestions';
 
 type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'summary';
@@ -36,6 +36,16 @@ export default function DecomposeFlow() {
   const [classWhat, setClassWhat] = useState('');
   const [classHow, setClassHow] = useState('');
   const [classWhy, setClassWhy] = useState('');
+
+  // Pending item — staged for weight personalization before adding
+  const [pendingItem, setPendingItem] = useState<{
+    name: string;
+    compartment: Compartment;
+    utility: number;
+    dimensions?: WeightDimensions;
+    baselineWeight: number;
+    personalWeight: number;
+  } | null>(null);
 
   // Summary tracking
   const [decomposedIds, setDecomposedIds] = useState<string[]>([]);
@@ -80,29 +90,54 @@ export default function DecomposeFlow() {
     });
   };
 
-  const addSuggestion = (sub: SubItemSuggestion) => {
+  const stageSuggestion = (sub: SubItemSuggestion) => {
     if (!currentItemId) return;
-    // Prevent duplicates — check store directly for fresh children
     const existingChildren = getChildItems(currentItemId);
     if (existingChildren.some(c => c.name.toLowerCase() === sub.name.toLowerCase())) return;
     const w = dimensionsToWeight(sub.dimensions);
-    addSubItem(
-      sub.name,
-      sub.compartment ?? currentItem?.compartment ?? 'stones',
-      w,
-      sub.utility,
-      sub.dimensions,
-    );
+    setPendingItem({
+      name: sub.name,
+      compartment: sub.compartment ?? currentItem?.compartment ?? 'stones',
+      utility: sub.utility,
+      dimensions: sub.dimensions,
+      baselineWeight: w,
+      personalWeight: w,
+    });
   };
 
-  const addCustom = () => {
+  const stageCustom = () => {
     if (!customText.trim() || !currentItem || !currentItemId) return;
-    // Prevent duplicates
     const existingChildren = getChildItems(currentItemId);
     if (existingChildren.some(c => c.name.toLowerCase() === customText.trim().toLowerCase())) return;
-    addSubItem(customText.trim(), currentItem.compartment, 5, 5);
+    setPendingItem({
+      name: customText.trim(),
+      compartment: currentItem.compartment,
+      utility: 5,
+      baselineWeight: 5,
+      personalWeight: 5,
+    });
     setCustomText('');
   };
+
+  const confirmPending = () => {
+    if (!pendingItem) return;
+    // Scale dimensions proportionally if user changed the weight
+    let dims = pendingItem.dimensions;
+    if (dims && pendingItem.personalWeight !== pendingItem.baselineWeight) {
+      const scale = pendingItem.personalWeight / Math.max(1, pendingItem.baselineWeight);
+      dims = {
+        stress: Math.max(1, Math.min(5, Math.round(dims.stress * scale))),
+        worry: Math.max(1, Math.min(5, Math.round(dims.worry * scale))),
+        cognitive: Math.max(1, Math.min(5, Math.round(dims.cognitive * scale))),
+        urgency: Math.max(1, Math.min(5, Math.round(dims.urgency * scale))),
+        emotional: Math.max(1, Math.min(5, Math.round(dims.emotional * scale))),
+      };
+    }
+    addSubItem(pendingItem.name, pendingItem.compartment, pendingItem.personalWeight, pendingItem.utility, dims);
+    setPendingItem(null);
+  };
+
+  const cancelPending = () => setPendingItem(null);
 
   const finishDecomposing = () => {
     if (!currentItemId) return;
@@ -331,8 +366,57 @@ export default function DecomposeFlow() {
                 </div>
               )}
 
+              {/* Weight personalization for pending item */}
+              {pendingItem && (
+                <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-white font-medium">{pendingItem.name}</span>
+                    <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
+                  </div>
+                  <p className="text-xs text-slate-500">How heavy is this <span className="text-white">for you</span>?</p>
+                  <div className="flex gap-2">
+                    {WEIGHT_PRESETS.map(preset => (
+                      <button
+                        key={preset.value}
+                        onClick={() => setPendingItem(p => p ? { ...p, personalWeight: preset.value } : p)}
+                        className={`flex-1 py-2.5 rounded-lg text-center transition-colors ${
+                          pendingItem.personalWeight === preset.value
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="text-sm font-medium block">{preset.label}</span>
+                        <span className="text-[10px] block mt-0.5">{preset.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      value={pendingItem.personalWeight}
+                      onChange={e => setPendingItem(p => p ? { ...p, personalWeight: Number(e.target.value) } : p)}
+                      className="flex-1 accent-amber-500"
+                    />
+                    <span className="text-rose-400 font-mono text-sm w-6 text-right">{pendingItem.personalWeight}</span>
+                  </div>
+                  {pendingItem.personalWeight !== pendingItem.baselineWeight && (
+                    <p className="text-[10px] text-slate-600">
+                      Baseline was {pendingItem.baselineWeight} — adjusted to {pendingItem.personalWeight}
+                    </p>
+                  )}
+                  <button
+                    onClick={confirmPending}
+                    className="w-full py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
+                  >
+                    Add at weight {pendingItem.personalWeight}
+                  </button>
+                </div>
+              )}
+
               {/* Suggestions */}
-              {(() => {
+              {!pendingItem && (() => {
                 const addedNames = new Set(currentChildren.map(c => c.name.toLowerCase()));
                 const remaining = subSuggestions.filter(s => !addedNames.has(s.name.toLowerCase()));
                 return remaining.length > 0 ? (
@@ -342,7 +426,7 @@ export default function DecomposeFlow() {
                       return (
                         <button
                           key={sub.name}
-                          onClick={() => addSuggestion(sub)}
+                          onClick={() => stageSuggestion(sub)}
                           className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
                         >
                           <span className="text-sm text-white">{sub.name}</span>
@@ -355,23 +439,25 @@ export default function DecomposeFlow() {
               })()}
 
               {/* Custom input */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customText}
-                  onChange={e => setCustomText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addCustom()}
-                  placeholder="Or type something specific..."
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
-                />
-                <button
-                  onClick={addCustom}
-                  disabled={!customText.trim()}
-                  className="px-4 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 disabled:opacity-40"
-                >
-                  Add
-                </button>
-              </div>
+              {!pendingItem && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customText}
+                    onChange={e => setCustomText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && stageCustom()}
+                    placeholder="Or type something specific..."
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
+                  />
+                  <button
+                    onClick={stageCustom}
+                    disabled={!customText.trim()}
+                    className="px-4 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 disabled:opacity-40"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
 
               {/* Done button */}
               <button
