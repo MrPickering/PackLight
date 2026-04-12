@@ -42,6 +42,10 @@ export interface ItemClassification {
   what: string;       // "What is this thing?"
   how: string;        // "How does it affect your daily life?"
   why: string;        // "Why does it weigh on you?"
+  // Hidden direction signal captured from the "why" follow-up buttons.
+  // 'internal' = "about me" (beliefs, patterns, identity); signals we're close to bedrock.
+  // 'external' = "about something in my life" (circumstances, others); candidate for deferral.
+  direction?: 'internal' | 'external';
   classifiedAt: string;
 }
 

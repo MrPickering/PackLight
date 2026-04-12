@@ -205,12 +205,13 @@ export default function DecomposeFlow() {
     }
   };
 
-  const handleClassifySubmit = () => {
+  const handleClassifySubmit = (direction?: 'internal' | 'external') => {
     if (classifyTarget && (classWhat.trim() || classHow.trim() || classWhy.trim())) {
       classifyItem(classifyTarget, {
         what: classWhat.trim(),
         how: classHow.trim(),
         why: classWhy.trim(),
+        ...(direction ? { direction } : {}),
         classifiedAt: new Date().toISOString(),
       });
       setClassifiedIds(prev => [...prev, classifyTarget]);
@@ -561,6 +562,33 @@ export default function DecomposeFlow() {
                 </div>
               </div>
 
+              {/* Why follow-up — direction signal. Only surfaces once the user has started answering. */}
+              {classWhy.trim().length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs text-slate-500">When you read that back, is it…</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleClassifySubmit('external')}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-left hover:border-sky-500/40 transition-colors"
+                    >
+                      <span className="text-sm text-white font-medium block">About something in my life</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">
+                        A situation, a person, a circumstance
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleClassifySubmit('internal')}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-left hover:border-amber-500/40 transition-colors"
+                    >
+                      <span className="text-sm text-white font-medium block">About me</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">
+                        A belief, a pattern, something I carry
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Coach-mark.ai CTA */}
               <a
                 href="https://coach-mark.ai"
@@ -579,7 +607,7 @@ export default function DecomposeFlow() {
                   Skip for now
                 </button>
                 <button
-                  onClick={handleClassifySubmit}
+                  onClick={() => handleClassifySubmit()}
                   className="flex-1 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
                 >
                   Save
