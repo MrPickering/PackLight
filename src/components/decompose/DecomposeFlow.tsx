@@ -36,6 +36,8 @@ export default function DecomposeFlow() {
   const [classWhat, setClassWhat] = useState('');
   const [classHow, setClassHow] = useState('');
   const [classWhy, setClassWhy] = useState('');
+  // Brief acknowledgment shown between classify and advance, once a direction is chosen.
+  const [directionAck, setDirectionAck] = useState<'internal' | 'external' | null>(null);
 
   // Pending item — staged for dimension rating before adding
   const [pendingItem, setPendingItem] = useState<{
@@ -216,7 +218,16 @@ export default function DecomposeFlow() {
       });
       setClassifiedIds(prev => [...prev, classifyTarget]);
     }
-    advanceToNextChild();
+    // If a direction was chosen, show a brief acknowledgment before advancing.
+    if (direction) {
+      setDirectionAck(direction);
+      setTimeout(() => {
+        setDirectionAck(null);
+        advanceToNextChild();
+      }, 1400);
+    } else {
+      advanceToNextChild();
+    }
   };
 
   const handleClassifySkip = () => {
@@ -516,7 +527,30 @@ export default function DecomposeFlow() {
           )}
 
           {/* ── Classify Atomic Item ── */}
-          {step === 'classify' && classifyTargetItem && (
+          {step === 'classify' && classifyTargetItem && directionAck && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-xl p-6 text-center border ${
+                directionAck === 'internal'
+                  ? 'bg-amber-500/5 border-amber-500/30'
+                  : 'bg-sky-500/5 border-sky-500/30'
+              }`}
+            >
+              <p className={`text-sm font-medium ${directionAck === 'internal' ? 'text-amber-200' : 'text-sky-200'}`}>
+                {directionAck === 'internal'
+                  ? 'Noted — you might be close to the root.'
+                  : "Noted — we'll come back to that."}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">
+                {directionAck === 'internal'
+                  ? 'Worth staying with.'
+                  : 'Parked for a future session.'}
+              </p>
+            </motion.div>
+          )}
+
+          {step === 'classify' && classifyTargetItem && !directionAck && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2">
