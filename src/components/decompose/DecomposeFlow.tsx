@@ -10,6 +10,28 @@ import type { SubItemSuggestion } from '../../types/suggestions';
 
 type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'summary';
 
+// Maps a weight (roughly 1–10) to a visual size for the boulder emoji.
+// Heavy items look like bigger rocks; light ones look like pebbles.
+function boulderFontSize(weight: number): string {
+  const clamped = Math.max(1, Math.min(10, weight));
+  return `${0.95 + clamped * 0.18}em`;
+}
+
+function Boulder({ weight, className = '' }: { weight: number; className?: string }) {
+  return (
+    <motion.span
+      className={`inline-block leading-none select-none ${className}`}
+      style={{ fontSize: boulderFontSize(weight) }}
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+      aria-hidden
+    >
+      🪨
+    </motion.span>
+  );
+}
+
 export default function DecomposeFlow() {
   const { itemId: routeItemId } = useParams<{ itemId?: string }>();
   const navigate = useNavigate();
@@ -364,21 +386,17 @@ export default function DecomposeFlow() {
                     <button
                       key={item.id}
                       onClick={() => selectItem(item.id)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors flex items-center gap-3"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{COMPARTMENT_META[item.compartment].emoji}</span>
-                        <div>
-                          <span className="text-sm text-white font-medium">{item.name}</span>
-                          <span className="block text-[10px] text-slate-500">
-                            {COMPARTMENT_META[item.compartment].label}
-                          </span>
-                        </div>
+                      <Boulder weight={item.weight} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-white font-medium block truncate">{item.name}</span>
+                        <span className="block text-[10px] text-slate-500">
+                          {COMPARTMENT_META[item.compartment].emoji} {COMPARTMENT_META[item.compartment].label}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-rose-400 font-mono text-sm">W:{item.weight}</span>
-                        <ArrowRight size={14} className="text-slate-600" />
-                      </div>
+                      <span className="text-rose-400 font-mono text-sm">W:{item.weight}</span>
+                      <ArrowRight size={14} className="text-slate-600" />
                     </button>
                   ))}
                 </>
@@ -404,10 +422,10 @@ export default function DecomposeFlow() {
           {step === 'decompose' && currentItem && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{COMPARTMENT_META[currentItem.compartment].emoji}</span>
-                  <span className="text-white font-medium">{currentItem.name}</span>
-                  <span className="text-rose-400 font-mono text-sm ml-auto">W:{currentItem.weight}</span>
+                <div className="flex items-center gap-3 mb-1">
+                  <Boulder weight={currentItem.weight} />
+                  <span className="text-white font-medium flex-1">{currentItem.name}</span>
+                  <span className="text-rose-400 font-mono text-sm">W:{currentItem.weight}</span>
                 </div>
                 {decomposeStack.length > 1 && (
                   <p className="text-[10px] text-slate-500">
@@ -457,8 +475,9 @@ export default function DecomposeFlow() {
                     Pieces identified ({currentChildren.length})
                   </span>
                   {currentChildren.map(child => (
-                    <div key={child.id} className="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center justify-between">
-                      <span className="text-sm text-slate-300">{child.name}</span>
+                    <div key={child.id} className="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center gap-3">
+                      <Boulder weight={child.weight} />
+                      <span className="text-sm text-slate-300 flex-1">{child.name}</span>
                       <span className="text-xs text-rose-400 font-mono">W:{child.weight}</span>
                     </div>
                   ))}
@@ -484,8 +503,10 @@ export default function DecomposeFlow() {
                 const computedWeight = activeCount > 0 ? dimensionsToWeight(pendingItem.dimensions) : 3;
                 return (
                   <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-white font-medium">{pendingItem.name}</span>
+                    <div className="flex items-center gap-3">
+                      {/* The boulder grows/shrinks live as the user tunes dimensions. */}
+                      <Boulder weight={computedWeight} />
+                      <span className="text-sm text-white font-medium flex-1">{pendingItem.name}</span>
                       <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
                     </div>
                     <p className="text-xs text-slate-500">
@@ -545,10 +566,11 @@ export default function DecomposeFlow() {
                         <button
                           key={sub.name}
                           onClick={() => stageSuggestion(sub)}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center gap-3"
                         >
-                          <span className="text-sm text-white">{sub.name}</span>
-                          <span className="text-xs text-slate-500 font-mono shrink-0 ml-2">{w}</span>
+                          <Boulder weight={w} />
+                          <span className="text-sm text-white flex-1">{sub.name}</span>
+                          <span className="text-xs text-slate-500 font-mono shrink-0">{w}</span>
                         </button>
                       );
                     })}
@@ -595,10 +617,10 @@ export default function DecomposeFlow() {
               </p>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{COMPARTMENT_META[currentChildItem.compartment].emoji}</span>
-                  <span className="text-white font-medium">{currentChildItem.name}</span>
-                  <span className="text-rose-400 font-mono text-sm ml-auto">W:{currentChildItem.weight}</span>
+                <div className="flex items-center gap-3">
+                  <Boulder weight={currentChildItem.weight} />
+                  <span className="text-white font-medium flex-1">{currentChildItem.name}</span>
+                  <span className="text-rose-400 font-mono text-sm">W:{currentChildItem.weight}</span>
                 </div>
               </div>
 
@@ -660,9 +682,10 @@ export default function DecomposeFlow() {
           {step === 'classify' && classifyTargetItem && !directionAck && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <Boulder weight={classifyTargetItem.weight} />
+                  <span className="text-white font-medium flex-1">{classifyTargetItem.name}</span>
                   <Atom size={16} className="text-emerald-400" />
-                  <span className="text-white font-medium">{classifyTargetItem.name}</span>
                 </div>
               </div>
 
