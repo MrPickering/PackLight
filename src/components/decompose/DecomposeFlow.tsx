@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Layers, Atom, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Atom, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
@@ -38,6 +38,10 @@ export default function DecomposeFlow() {
   const [classWhy, setClassWhy] = useState('');
   // Brief acknowledgment shown between classify and advance, once a direction is chosen.
   const [directionAck, setDirectionAck] = useState<'internal' | 'external' | null>(null);
+  // Transient animation played when a big rock is being unpacked into smaller ones.
+  const [showBreaking, setShowBreaking] = useState(false);
+  // Ephemeral rock-drop animation when confirming a sub-item.
+  const [droppingRock, setDroppingRock] = useState(false);
 
   // Pending item — staged for dimension rating before adding
   const [pendingItem, setPendingItem] = useState<{
@@ -134,6 +138,9 @@ export default function DecomposeFlow() {
     const w = hasAny ? dimensionsToWeight(dims) : 3;
     addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, hasAny ? dims : undefined);
     setPendingItem(null);
+    // Play a quick "rock drops into pack" feedback.
+    setDroppingRock(true);
+    setTimeout(() => setDroppingRock(false), 700);
   };
 
   const cancelPending = () => setPendingItem(null);
@@ -165,9 +172,13 @@ export default function DecomposeFlow() {
     if (!childId) return;
 
     if (action === 'deeper') {
-      // Push onto stack and decompose this child
-      setDecomposeStack(prev => [...prev, childId]);
-      setStep('decompose');
+      // Play the big-rock-breaks-into-small-rocks animation, then advance.
+      setShowBreaking(true);
+      setTimeout(() => {
+        setDecomposeStack(prev => [...prev, childId]);
+        setStep('decompose');
+        setShowBreaking(false);
+      }, 950);
     } else {
       // Mark as atomic, go to classification
       markAtomic(childId);
@@ -251,11 +262,73 @@ export default function DecomposeFlow() {
         </button>
         <div>
           <h1 className="text-xl font-semibold text-white flex items-center gap-2">
-            <Layers size={20} /> Decompose
+            <motion.span
+              key={`pack-${decomposeStack.length}`}
+              initial={{ scale: 0.6, rotate: -14 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 12 }}
+              className="text-2xl inline-block"
+              aria-hidden
+            >
+              🎒
+            </motion.span>
+            Decompose
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">Break big rocks into small ones</p>
         </div>
       </div>
+
+      {/* Big rock → small rocks overlay (plays briefly on unpack) */}
+      <AnimatePresence>
+        {showBreaking && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm pointer-events-none"
+          >
+            <div className="relative w-40 h-40 flex items-center justify-center">
+              {/* The big rock shakes, then shatters */}
+              <motion.div
+                className="absolute text-6xl"
+                initial={{ scale: 1, rotate: 0, opacity: 1 }}
+                animate={{
+                  scale: [1, 1.15, 1.15, 0],
+                  rotate: [0, -10, 10, -6, 0],
+                  opacity: [1, 1, 1, 0],
+                }}
+                transition={{ duration: 0.55, times: [0, 0.35, 0.6, 1] }}
+              >
+                🪨
+              </motion.div>
+              {/* Shards fly outward */}
+              {[
+                { x: -70, y: -30, r: -30 },
+                { x: 70, y: -20, r: 25 },
+                { x: -20, y: 60, r: 15 },
+                { x: 50, y: 55, r: -20 },
+              ].map((d, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute text-3xl"
+                  initial={{ x: 0, y: 0, scale: 0.2, opacity: 0, rotate: 0 }}
+                  animate={{
+                    x: [0, 0, d.x],
+                    y: [0, 0, d.y],
+                    scale: [0.2, 0.2, 1, 1],
+                    rotate: [0, 0, d.r],
+                    opacity: [0, 0, 1, 1],
+                  }}
+                  transition={{ duration: 0.9, times: [0, 0.5, 0.75, 1], delay: i * 0.03 }}
+                >
+                  🪨
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Progress indicator */}
       {step !== 'select' && step !== 'summary' && (
@@ -346,6 +419,36 @@ export default function DecomposeFlow() {
               <p className="text-sm text-slate-400">
                 What makes <span className="text-white">"{currentItem.name}"</span> heavy? Break it down.
               </p>
+
+              {/* Rock-drops-into-pack feedback */}
+              <AnimatePresence>
+                {droppingRock && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="relative h-0 flex justify-center pointer-events-none"
+                  >
+                    <motion.span
+                      className="absolute text-2xl"
+                      initial={{ y: -30, opacity: 0, scale: 0.8 }}
+                      animate={{ y: 20, opacity: [0, 1, 1, 0], scale: [0.8, 1, 1, 0.6] }}
+                      transition={{ duration: 0.7, times: [0, 0.3, 0.7, 1] }}
+                    >
+                      🪨
+                    </motion.span>
+                    <motion.span
+                      className="absolute text-2xl"
+                      style={{ top: 24 }}
+                      initial={{ scale: 1 }}
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                    >
+                      🎒
+                    </motion.span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Children added so far */}
               {currentChildren.length > 0 && (
@@ -504,24 +607,28 @@ export default function DecomposeFlow() {
               </p>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleClassifyOrDeeper('deeper')}
                   className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors"
                 >
-                  <Layers size={20} className="text-amber-400 mb-2" />
+                  <span className="text-2xl mb-2 block" aria-hidden>🪨</span>
                   <span className="text-sm text-white font-medium block">Yes, unpack it</span>
                   <span className="text-[10px] text-slate-500 mt-1 block">
                     Break it into smaller pieces
                   </span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleClassifyOrDeeper('atomic')}
                   className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-emerald-500/30 transition-colors"
                 >
                   <Atom size={20} className="text-emerald-400 mb-2" />
                   <span className="text-sm text-white font-medium block">No, it's atomic</span>
                   <span className="text-[10px] text-slate-500 mt-1 block">This is as small as it gets</span>
-                </button>
+                </motion.button>
               </div>
             </div>
           )}
@@ -658,7 +765,15 @@ export default function DecomposeFlow() {
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 200 }}
               >
-                <Layers size={40} className="text-amber-500 mx-auto mb-3" />
+                <motion.span
+                  className="text-5xl block mx-auto mb-3"
+                  initial={{ rotate: -20, y: -10 }}
+                  animate={{ rotate: 0, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 180, damping: 10 }}
+                  aria-hidden
+                >
+                  🎒
+                </motion.span>
                 <h2 className="text-lg font-medium text-white">Decomposition Complete</h2>
               </motion.div>
 
