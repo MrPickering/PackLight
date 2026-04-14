@@ -32,6 +32,12 @@ function Boulder({ weight, className = '' }: { weight: number; className?: strin
   );
 }
 
+// Clamp a weight (1-10) to a grid-column span. Heavier rocks take up
+// more of the 10-column grid; tiny ones become small tiles.
+function weightSpan(weight: number): number {
+  return Math.max(1, Math.min(10, Math.round(weight)));
+}
+
 export default function DecomposeFlow() {
   const { itemId: routeItemId } = useParams<{ itemId?: string }>();
   const navigate = useNavigate();
@@ -482,13 +488,24 @@ export default function DecomposeFlow() {
                   <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                     Pieces identified ({currentChildren.length})
                   </span>
-                  {currentChildren.map(child => (
-                    <div key={child.id} className="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center gap-3">
-                      <Boulder weight={child.weight} />
-                      <span className="text-sm text-slate-300 flex-1">{child.name}</span>
-                      <span className="text-xs text-rose-400 font-mono">W:{child.weight}</span>
-                    </div>
-                  ))}
+                  <div className="grid grid-cols-10 grid-flow-dense gap-1.5">
+                    {currentChildren.map(child => {
+                      const span = weightSpan(child.weight);
+                      return (
+                        <div
+                          key={child.id}
+                          style={{ gridColumn: `span ${span} / span ${span}` }}
+                          className="bg-slate-800/50 rounded-lg px-2 py-1.5 flex items-center gap-1.5 min-w-0"
+                        >
+                          <Boulder weight={child.weight} />
+                          <span className="text-xs text-slate-300 truncate flex-1">{child.name}</span>
+                          {span >= 3 && (
+                            <span className="text-[10px] text-rose-400 font-mono shrink-0">{child.weight}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   {/* Lawn moment */}
                   {(() => {
@@ -567,18 +584,22 @@ export default function DecomposeFlow() {
                 const addedNames = new Set(currentChildren.map(c => c.name.toLowerCase()));
                 const remaining = subSuggestions.filter(s => !addedNames.has(s.name.toLowerCase()));
                 return remaining.length > 0 ? (
-                  <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
+                  <div className="grid grid-cols-10 grid-flow-dense gap-1.5 max-h-[40vh] overflow-y-auto pr-1">
                     {remaining.map(sub => {
                       const w = dimensionsToWeight(sub.dimensions);
+                      const span = weightSpan(w);
                       return (
                         <button
                           key={sub.name}
                           onClick={() => stageSuggestion(sub)}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center gap-3"
+                          style={{ gridColumn: `span ${span} / span ${span}` }}
+                          className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-left hover:border-amber-500/30 transition-colors flex items-center gap-1.5 min-w-0"
                         >
                           <Boulder weight={w} />
-                          <span className="text-sm text-white flex-1">{sub.name}</span>
-                          <span className="text-xs text-slate-500 font-mono shrink-0">{w}</span>
+                          <span className="text-xs text-white truncate flex-1">{sub.name}</span>
+                          {span >= 3 && (
+                            <span className="text-[10px] text-slate-500 font-mono shrink-0">{w}</span>
+                          )}
                         </button>
                       );
                     })}
