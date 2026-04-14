@@ -29,18 +29,19 @@ export const TOP_LEVEL_CATEGORIES: TopLevelCategory[] = [
     id: 'work', label: 'Work / Career', emoji: '💼',
     compartment: 'chains', contexts: ['work'], utility: 7,
     subItems: [
-      { name: 'The commute', dimensions: { stress: 3, worry: 1, cognitive: 2, urgency: 3, emotional: 2 }, utility: 2 },
-      { name: 'A coworker or boss', dimensions: { stress: 4, worry: 3, cognitive: 3, urgency: 2, emotional: 4 }, utility: 3 },
-      { name: 'Deadline pressure', dimensions: { stress: 4, worry: 3, cognitive: 3, urgency: 5, emotional: 2 }, utility: 4 },
-      { name: 'Too many meetings', dimensions: { stress: 3, worry: 1, cognitive: 4, urgency: 3, emotional: 2 }, utility: 3 },
-      { name: 'Workload', dimensions: { stress: 4, worry: 3, cognitive: 5, urgency: 4, emotional: 2 }, utility: 4 },
-      { name: 'Office politics', dimensions: { stress: 3, worry: 3, cognitive: 4, urgency: 2, emotional: 4 }, utility: 2 },
-      { name: 'Imposter syndrome', compartment: 'stones', dimensions: { stress: 3, worry: 5, cognitive: 4, urgency: 1, emotional: 4 }, utility: 3 },
-      { name: 'Underpaid / undervalued', compartment: 'stones', dimensions: { stress: 3, worry: 4, cognitive: 3, urgency: 2, emotional: 4 }, utility: 2 },
-      { name: 'Job insecurity', compartment: 'stones', dimensions: { stress: 4, worry: 5, cognitive: 4, urgency: 3, emotional: 3 }, utility: 2 },
-      { name: 'Work-life balance', dimensions: { stress: 4, worry: 3, cognitive: 3, urgency: 3, emotional: 3 }, utility: 3 },
-      { name: 'Email / Slack overload', dimensions: { stress: 3, worry: 2, cognitive: 4, urgency: 3, emotional: 1 }, utility: 2 },
-      { name: 'Boring / unstimulating', compartment: 'stones', dimensions: { stress: 2, worry: 3, cognitive: 2, urgency: 1, emotional: 3 }, utility: 2 },
+      // TEMP: visual test fixture — one item at each weight 1–10 so the
+      // boulder grid shows the full size range. Restore real suggestions
+      // once the visualization is dialled in.
+      { name: 'Tiny annoyance',     dimensions: { stress: 3, worry: 0, cognitive: 0, urgency: 0, emotional: 0 }, utility: 2 }, // W1 (sum 3)
+      { name: 'Email backlog',      dimensions: { stress: 1, worry: 1, cognitive: 1, urgency: 1, emotional: 1 }, utility: 2 }, // W2 (sum 5)
+      { name: 'Bad meeting',        dimensions: { stress: 2, worry: 2, cognitive: 2, urgency: 1, emotional: 1 }, utility: 2 }, // W3 (sum 8)
+      { name: 'Tight deadline',     dimensions: { stress: 2, worry: 2, cognitive: 2, urgency: 2, emotional: 2 }, utility: 3 }, // W4 (sum 10)
+      { name: 'Difficult coworker', dimensions: { stress: 3, worry: 3, cognitive: 3, urgency: 2, emotional: 2 }, utility: 3 }, // W5 (sum 13)
+      { name: 'Workload spike',     dimensions: { stress: 3, worry: 3, cognitive: 3, urgency: 3, emotional: 3 }, utility: 3 }, // W6 (sum 15)
+      { name: 'Imposter syndrome',  compartment: 'stones', dimensions: { stress: 4, worry: 4, cognitive: 4, urgency: 3, emotional: 3 }, utility: 3 }, // W7 (sum 18)
+      { name: 'Job insecurity',     compartment: 'stones', dimensions: { stress: 4, worry: 4, cognitive: 4, urgency: 4, emotional: 4 }, utility: 2 }, // W8 (sum 20)
+      { name: 'Career regret',      compartment: 'stones', dimensions: { stress: 5, worry: 5, cognitive: 5, urgency: 4, emotional: 4 }, utility: 2 }, // W9 (sum 23)
+      { name: 'Wrong career path',  compartment: 'stones', dimensions: { stress: 5, worry: 5, cognitive: 5, urgency: 5, emotional: 5 }, utility: 1 }, // W10 (sum 25)
     ],
   },
   {
