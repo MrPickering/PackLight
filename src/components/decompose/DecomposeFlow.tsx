@@ -13,10 +13,12 @@ type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'su
 // Maps a weight (roughly 1–10) to a visual size for the boulder emoji.
 // Using direct pixel values rather than em — emoji glyphs on many devices
 // snap between rendered sizes and small em differences become invisible,
-// so we push the range hard: a pebble is ~18px, a boulder is ~68px (~3.8×).
+// so we push the range hard: a pebble is ~16px, a boulder is ~44px (~2.75×).
+// Capped so heavy boulders fit inside fixed-height tiles without
+// inflating their grid row.
 function boulderFontSize(weight: number): string {
   const clamped = Math.max(1, Math.min(10, weight));
-  return `${12 + clamped * 5.6}px`;
+  return `${12 + clamped * 3.2}px`;
 }
 
 function Boulder({ weight, className = '' }: { weight: number; className?: string }) {
@@ -497,7 +499,7 @@ export default function DecomposeFlow() {
                         <div
                           key={child.id}
                           style={{ gridColumn: `span ${span} / span ${span}` }}
-                          className="bg-slate-800/50 rounded-lg px-1.5 py-1.5 flex flex-col items-center gap-1 min-w-0"
+                          className="bg-slate-800/50 rounded-lg px-1.5 py-1.5 flex flex-col items-center justify-end gap-1 min-w-0 h-20 overflow-hidden"
                         >
                           <Boulder weight={child.weight} />
                           <span className="text-[10px] leading-tight text-slate-300 text-center truncate w-full">{child.name}</span>
@@ -592,7 +594,7 @@ export default function DecomposeFlow() {
                           key={sub.name}
                           onClick={() => stageSuggestion(sub)}
                           style={{ gridColumn: `span ${span} / span ${span}` }}
-                          className="bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-2 hover:border-amber-500/30 transition-colors flex flex-col items-center gap-1 min-w-0"
+                          className="bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-2 hover:border-amber-500/30 transition-colors flex flex-col items-center justify-end gap-1 min-w-0 h-20 overflow-hidden"
                         >
                           <Boulder weight={w} />
                           <span className="text-[10px] leading-tight text-white text-center truncate w-full">{sub.name}</span>
