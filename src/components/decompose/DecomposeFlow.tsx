@@ -12,9 +12,11 @@ type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'su
 
 // Maps a weight (roughly 1–10) to a visual size for the boulder emoji.
 // Heavy items look like bigger rocks; light ones look like pebbles.
+// The range is deliberately wide (~3.5×) so the weight difference is
+// obvious without squinting — a weight-10 rock is ~4× the area of a pebble.
 function boulderFontSize(weight: number): string {
   const clamped = Math.max(1, Math.min(10, weight));
-  return `${0.95 + clamped * 0.18}em`;
+  return `${0.8 + clamped * 0.32}em`;
 }
 
 function Boulder({ weight, className = '' }: { weight: number; className?: string }) {
