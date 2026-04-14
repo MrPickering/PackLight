@@ -36,12 +36,6 @@ function Boulder({ weight, className = '' }: { weight: number; className?: strin
   );
 }
 
-// Clamp a weight (1-10) to a grid-column span. Heavier rocks take up
-// more of the 10-column grid; tiny ones become small tiles.
-function weightSpan(weight: number): number {
-  return Math.max(1, Math.min(10, Math.round(weight)));
-}
-
 export default function DecomposeFlow() {
   const { itemId: routeItemId } = useParams<{ itemId?: string }>();
   const navigate = useNavigate();
@@ -492,20 +486,16 @@ export default function DecomposeFlow() {
                   <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                     Pieces identified ({currentChildren.length})
                   </span>
-                  <div className="grid grid-cols-10 grid-flow-dense gap-1.5 items-end">
-                    {currentChildren.map(child => {
-                      const span = weightSpan(child.weight);
-                      return (
-                        <div
-                          key={child.id}
-                          style={{ gridColumn: `span ${span} / span ${span}` }}
-                          className="bg-slate-800/50 rounded-lg px-1.5 py-1.5 flex flex-col items-center justify-end gap-1 min-w-0 h-20 overflow-hidden"
-                        >
-                          <Boulder weight={child.weight} />
-                          <span className="text-[10px] leading-tight text-slate-300 text-center truncate w-full">{child.name}</span>
-                        </div>
-                      );
-                    })}
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                    {currentChildren.map(child => (
+                      <div
+                        key={child.id}
+                        className="flex flex-col items-center"
+                      >
+                        <Boulder weight={child.weight} />
+                        <span className="text-[10px] leading-tight text-slate-300 text-center mt-0.5">{child.name}</span>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Lawn moment */}
@@ -585,19 +575,17 @@ export default function DecomposeFlow() {
                 const addedNames = new Set(currentChildren.map(c => c.name.toLowerCase()));
                 const remaining = subSuggestions.filter(s => !addedNames.has(s.name.toLowerCase()));
                 return remaining.length > 0 ? (
-                  <div className="grid grid-cols-10 grid-flow-dense gap-1.5 items-end max-h-[40vh] overflow-y-auto pr-1">
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2 max-h-[40vh] overflow-y-auto pr-1">
                     {remaining.map(sub => {
                       const w = dimensionsToWeight(sub.dimensions);
-                      const span = weightSpan(w);
                       return (
                         <button
                           key={sub.name}
                           onClick={() => stageSuggestion(sub)}
-                          style={{ gridColumn: `span ${span} / span ${span}` }}
-                          className="bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-2 hover:border-amber-500/30 transition-colors flex flex-col items-center justify-end gap-1 min-w-0 h-20 overflow-hidden"
+                          className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
                         >
                           <Boulder weight={w} />
-                          <span className="text-[10px] leading-tight text-white text-center truncate w-full">{sub.name}</span>
+                          <span className="text-[10px] leading-tight text-white text-center mt-0.5">{sub.name}</span>
                         </button>
                       );
                     })}
