@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Atom, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
@@ -126,7 +126,14 @@ export default function DecomposeFlow() {
       name: sub.name,
       compartment: sub.compartment ?? currentItem?.compartment ?? 'stones',
       utility: sub.utility,
-      dimensions: { ...sub.dimensions },
+      // Any dimension that isn't pre-rated defaults to 2 — a neutral baseline.
+      dimensions: {
+        stress: sub.dimensions.stress || 2,
+        worry: sub.dimensions.worry || 2,
+        cognitive: sub.dimensions.cognitive || 2,
+        urgency: sub.dimensions.urgency || 2,
+        emotional: sub.dimensions.emotional || 2,
+      },
     });
   };
 
@@ -138,7 +145,8 @@ export default function DecomposeFlow() {
       name: customText.trim(),
       compartment: currentItem.compartment,
       utility: 5,
-      dimensions: { stress: 0, worry: 0, cognitive: 0, urgency: 0, emotional: 0 },
+      // Start each dimension at 2 — user adjusts up or down from there.
+      dimensions: { stress: 2, worry: 2, cognitive: 2, urgency: 2, emotional: 2 },
     });
     setCustomText('');
   };
@@ -156,8 +164,8 @@ export default function DecomposeFlow() {
     if (!pendingItem) return;
     const dims = pendingItem.dimensions;
     const hasAny = DIMENSION_KEYS.some(k => dims[k] > 0);
-    // Default to weight 3 if no dimensions rated
-    const w = hasAny ? dimensionsToWeight(dims) : 3;
+    // Default to weight 2 if the user cleared everything — matches the dimension default.
+    const w = hasAny ? dimensionsToWeight(dims) : 2;
     addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, hasAny ? dims : undefined);
     setPendingItem(null);
     // Play a quick "rock drops into pack" feedback.
@@ -405,7 +413,7 @@ export default function DecomposeFlow() {
                   <Check size={40} className="text-emerald-400 mx-auto" />
                   <h2 className="text-lg font-medium text-white">Everything examined</h2>
                   <p className="text-sm text-slate-400 max-w-md mx-auto">
-                    Every item in your pack has been broken down or marked as atomic. That's real clarity.
+                    Every item in your pack has been broken down or reduced to sand. That's real clarity.
                   </p>
                   <button
                     onClick={() => navigate('/')}
@@ -645,11 +653,11 @@ export default function DecomposeFlow() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => handleClassifyOrDeeper('atomic')}
-                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-emerald-500/30 transition-colors"
+                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors"
                 >
-                  <Atom size={20} className="text-emerald-400 mb-2" />
-                  <span className="text-sm text-white font-medium block">No, it's atomic</span>
-                  <span className="text-[10px] text-slate-500 mt-1 block">This is as small as it gets</span>
+                  <span className="text-2xl mb-2 block" aria-hidden>⏳</span>
+                  <span className="text-sm text-white font-medium block">No, it's sand</span>
+                  <span className="text-[10px] text-slate-500 mt-1 block">It's as fine as it gets</span>
                 </motion.button>
               </div>
             </div>
@@ -681,11 +689,11 @@ export default function DecomposeFlow() {
 
           {step === 'classify' && classifyTargetItem && !directionAck && (
             <div className="space-y-4">
-              <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
+              <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-3">
                   <Boulder weight={classifyTargetItem.weight} />
                   <span className="text-white font-medium flex-1">{classifyTargetItem.name}</span>
-                  <Atom size={16} className="text-emerald-400" />
+                  <span className="text-base" aria-hidden>⏳</span>
                 </div>
               </div>
 
@@ -806,8 +814,8 @@ export default function DecomposeFlow() {
                   <span className="text-[10px] text-slate-500">Unpacked</span>
                 </div>
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <span className="block font-mono text-2xl text-emerald-400">{atomicIds.length}</span>
-                  <span className="text-[10px] text-slate-500">Atomic</span>
+                  <span className="block font-mono text-2xl text-amber-300">{atomicIds.length}</span>
+                  <span className="text-[10px] text-slate-500">Sand</span>
                 </div>
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
                   <span className="block font-mono text-2xl text-violet-400">{classifiedIds.length}</span>
@@ -825,10 +833,10 @@ export default function DecomposeFlow() {
                     <div key={item.id} style={{ paddingLeft: depth * 16 }}>
                       <div className="flex items-center gap-2 py-1">
                         <span className="text-xs">{COMPARTMENT_META[item.compartment].emoji}</span>
-                        <span className={`text-xs ${item.isAtomic ? 'text-emerald-400' : item.isContainer ? 'text-amber-400' : 'text-slate-400'}`}>
+                        <span className={`text-xs ${item.isAtomic ? 'text-amber-300' : item.isContainer ? 'text-amber-400' : 'text-slate-400'}`}>
                           {item.name}
                         </span>
-                        {item.isAtomic && <Atom size={10} className="text-emerald-400" />}
+                        {item.isAtomic && <span className="text-[10px]" aria-hidden>⏳</span>}
                       </div>
                       {children.map(c => renderTree(c, depth + 1))}
                     </div>
