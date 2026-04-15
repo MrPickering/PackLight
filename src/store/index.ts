@@ -31,6 +31,8 @@ interface PackStore {
   markAtomic: (id: string) => void;
   getUnprocessedItems: () => PackItem[];
   getAtomicItems: () => PackItem[];
+  // Items whose classification was tagged external — deferred to revisit later.
+  getDeferredThreads: () => PackItem[];
 
   // Lightening actions
   setLighteningApproach: (id: string, approach: string) => void;
@@ -292,6 +294,12 @@ export const usePackStore = create<PackStore>()(
 
       getAtomicItems: () => {
         return get().items.filter(i => !i.droppedAt && i.isAtomic === true);
+      },
+
+      getDeferredThreads: () => {
+        return get().items.filter(
+          i => !i.droppedAt && i.classification?.direction === 'external',
+        );
       },
 
       addAgentNote: (note) => {

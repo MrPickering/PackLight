@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Layers, Atom, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
@@ -9,6 +9,32 @@ import { TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestion
 import type { SubItemSuggestion } from '../../types/suggestions';
 
 type FlowStep = 'select' | 'decompose' | 'classify-or-deeper' | 'classify' | 'summary';
+
+// Maps a weight (roughly 1–10) to a visual size for the boulder emoji.
+// Using direct pixel values rather than em — emoji glyphs on many devices
+// snap between rendered sizes and small em differences become invisible,
+// so we push the range hard: a pebble is ~16px, a boulder is ~44px (~2.75×).
+// Capped so heavy boulders fit inside fixed-height tiles without
+// inflating their grid row.
+function boulderFontSize(weight: number): string {
+  const clamped = Math.max(1, Math.min(10, weight));
+  return `${12 + clamped * 3.2}px`;
+}
+
+function Boulder({ weight, className = '' }: { weight: number; className?: string }) {
+  return (
+    <motion.span
+      className={`inline-block leading-none select-none ${className}`}
+      style={{ fontSize: boulderFontSize(weight) }}
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+      aria-hidden
+    >
+      🪨
+    </motion.span>
+  );
+}
 
 export default function DecomposeFlow() {
   const { itemId: routeItemId } = useParams<{ itemId?: string }>();
@@ -36,6 +62,12 @@ export default function DecomposeFlow() {
   const [classWhat, setClassWhat] = useState('');
   const [classHow, setClassHow] = useState('');
   const [classWhy, setClassWhy] = useState('');
+  // Brief acknowledgment shown between classify and advance, once a direction is chosen.
+  const [directionAck, setDirectionAck] = useState<'internal' | 'external' | null>(null);
+  // Transient animation played when a big rock is being unpacked into smaller ones.
+  const [showBreaking, setShowBreaking] = useState(false);
+  // Ephemeral rock-drop animation when confirming a sub-item.
+  const [droppingRock, setDroppingRock] = useState(false);
 
   // Pending item — staged for dimension rating before adding
   const [pendingItem, setPendingItem] = useState<{
@@ -98,7 +130,14 @@ export default function DecomposeFlow() {
       name: sub.name,
       compartment: sub.compartment ?? currentItem?.compartment ?? 'stones',
       utility: sub.utility,
-      dimensions: { ...sub.dimensions },
+      // Any dimension that isn't pre-rated defaults to 2 — a neutral baseline.
+      dimensions: {
+        stress: sub.dimensions.stress || 2,
+        worry: sub.dimensions.worry || 2,
+        cognitive: sub.dimensions.cognitive || 2,
+        urgency: sub.dimensions.urgency || 2,
+        emotional: sub.dimensions.emotional || 2,
+      },
     });
   };
 
@@ -110,7 +149,8 @@ export default function DecomposeFlow() {
       name: customText.trim(),
       compartment: currentItem.compartment,
       utility: 5,
-      dimensions: { stress: 0, worry: 0, cognitive: 0, urgency: 0, emotional: 0 },
+      // Start each dimension at 2 — user adjusts up or down from there.
+      dimensions: { stress: 2, worry: 2, cognitive: 2, urgency: 2, emotional: 2 },
     });
     setCustomText('');
   };
@@ -128,10 +168,13 @@ export default function DecomposeFlow() {
     if (!pendingItem) return;
     const dims = pendingItem.dimensions;
     const hasAny = DIMENSION_KEYS.some(k => dims[k] > 0);
-    // Default to weight 3 if no dimensions rated
-    const w = hasAny ? dimensionsToWeight(dims) : 3;
+    // Default to weight 2 if the user cleared everything — matches the dimension default.
+    const w = hasAny ? dimensionsToWeight(dims) : 2;
     addSubItem(pendingItem.name, pendingItem.compartment, w, pendingItem.utility, hasAny ? dims : undefined);
     setPendingItem(null);
+    // Play a quick "rock drops into pack" feedback.
+    setDroppingRock(true);
+    setTimeout(() => setDroppingRock(false), 700);
   };
 
   const cancelPending = () => setPendingItem(null);
@@ -163,9 +206,13 @@ export default function DecomposeFlow() {
     if (!childId) return;
 
     if (action === 'deeper') {
-      // Push onto stack and decompose this child
-      setDecomposeStack(prev => [...prev, childId]);
-      setStep('decompose');
+      // Play the big-rock-breaks-into-small-rocks animation, then advance.
+      setShowBreaking(true);
+      setTimeout(() => {
+        setDecomposeStack(prev => [...prev, childId]);
+        setStep('decompose');
+        setShowBreaking(false);
+      }, 950);
     } else {
       // Mark as atomic, go to classification
       markAtomic(childId);
@@ -205,17 +252,27 @@ export default function DecomposeFlow() {
     }
   };
 
-  const handleClassifySubmit = () => {
+  const handleClassifySubmit = (direction?: 'internal' | 'external') => {
     if (classifyTarget && (classWhat.trim() || classHow.trim() || classWhy.trim())) {
       classifyItem(classifyTarget, {
         what: classWhat.trim(),
         how: classHow.trim(),
         why: classWhy.trim(),
+        ...(direction ? { direction } : {}),
         classifiedAt: new Date().toISOString(),
       });
       setClassifiedIds(prev => [...prev, classifyTarget]);
     }
-    advanceToNextChild();
+    // If a direction was chosen, show a brief acknowledgment before advancing.
+    if (direction) {
+      setDirectionAck(direction);
+      setTimeout(() => {
+        setDirectionAck(null);
+        advanceToNextChild();
+      }, 1400);
+    } else {
+      advanceToNextChild();
+    }
   };
 
   const handleClassifySkip = () => {
@@ -239,11 +296,73 @@ export default function DecomposeFlow() {
         </button>
         <div>
           <h1 className="text-xl font-semibold text-white flex items-center gap-2">
-            <Layers size={20} /> Decompose
+            <motion.span
+              key={`pack-${decomposeStack.length}`}
+              initial={{ scale: 0.6, rotate: -14 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 12 }}
+              className="text-2xl inline-block"
+              aria-hidden
+            >
+              🎒
+            </motion.span>
+            Decompose
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">Break big rocks into small ones</p>
         </div>
       </div>
+
+      {/* Big rock → small rocks overlay (plays briefly on unpack) */}
+      <AnimatePresence>
+        {showBreaking && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm pointer-events-none"
+          >
+            <div className="relative w-40 h-40 flex items-center justify-center">
+              {/* The big rock shakes, then shatters */}
+              <motion.div
+                className="absolute text-6xl"
+                initial={{ scale: 1, rotate: 0, opacity: 1 }}
+                animate={{
+                  scale: [1, 1.15, 1.15, 0],
+                  rotate: [0, -10, 10, -6, 0],
+                  opacity: [1, 1, 1, 0],
+                }}
+                transition={{ duration: 0.55, times: [0, 0.35, 0.6, 1] }}
+              >
+                🪨
+              </motion.div>
+              {/* Shards fly outward */}
+              {[
+                { x: -70, y: -30, r: -30 },
+                { x: 70, y: -20, r: 25 },
+                { x: -20, y: 60, r: 15 },
+                { x: 50, y: 55, r: -20 },
+              ].map((d, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute text-3xl"
+                  initial={{ x: 0, y: 0, scale: 0.2, opacity: 0, rotate: 0 }}
+                  animate={{
+                    x: [0, 0, d.x],
+                    y: [0, 0, d.y],
+                    scale: [0.2, 0.2, 1, 1],
+                    rotate: [0, 0, d.r],
+                    opacity: [0, 0, 1, 1],
+                  }}
+                  transition={{ duration: 0.9, times: [0, 0.5, 0.75, 1], delay: i * 0.03 }}
+                >
+                  🪨
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Progress indicator */}
       {step !== 'select' && step !== 'summary' && (
@@ -279,21 +398,17 @@ export default function DecomposeFlow() {
                     <button
                       key={item.id}
                       onClick={() => selectItem(item.id)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors flex items-center gap-3"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{COMPARTMENT_META[item.compartment].emoji}</span>
-                        <div>
-                          <span className="text-sm text-white font-medium">{item.name}</span>
-                          <span className="block text-[10px] text-slate-500">
-                            {COMPARTMENT_META[item.compartment].label}
-                          </span>
-                        </div>
+                      <Boulder weight={item.weight} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-white font-medium block truncate">{item.name}</span>
+                        <span className="block text-[10px] text-slate-500">
+                          {COMPARTMENT_META[item.compartment].emoji} {COMPARTMENT_META[item.compartment].label}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-rose-400 font-mono text-sm">W:{item.weight}</span>
-                        <ArrowRight size={14} className="text-slate-600" />
-                      </div>
+                      <span className="text-rose-400 font-mono text-sm">W:{item.weight}</span>
+                      <ArrowRight size={14} className="text-slate-600" />
                     </button>
                   ))}
                 </>
@@ -302,7 +417,7 @@ export default function DecomposeFlow() {
                   <Check size={40} className="text-emerald-400 mx-auto" />
                   <h2 className="text-lg font-medium text-white">Everything examined</h2>
                   <p className="text-sm text-slate-400 max-w-md mx-auto">
-                    Every item in your pack has been broken down or marked as atomic. That's real clarity.
+                    Every item in your pack has been broken down or reduced to sand. That's real clarity.
                   </p>
                   <button
                     onClick={() => navigate('/')}
@@ -319,10 +434,10 @@ export default function DecomposeFlow() {
           {step === 'decompose' && currentItem && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{COMPARTMENT_META[currentItem.compartment].emoji}</span>
-                  <span className="text-white font-medium">{currentItem.name}</span>
-                  <span className="text-rose-400 font-mono text-sm ml-auto">W:{currentItem.weight}</span>
+                <div className="flex items-center gap-3 mb-1">
+                  <Boulder weight={currentItem.weight} />
+                  <span className="text-white font-medium flex-1">{currentItem.name}</span>
+                  <span className="text-rose-400 font-mono text-sm">W:{currentItem.weight}</span>
                 </div>
                 {decomposeStack.length > 1 && (
                   <p className="text-[10px] text-slate-500">
@@ -335,18 +450,53 @@ export default function DecomposeFlow() {
                 What makes <span className="text-white">"{currentItem.name}"</span> heavy? Break it down.
               </p>
 
+              {/* Rock-drops-into-pack feedback */}
+              <AnimatePresence>
+                {droppingRock && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="relative h-0 flex justify-center pointer-events-none"
+                  >
+                    <motion.span
+                      className="absolute text-2xl"
+                      initial={{ y: -30, opacity: 0, scale: 0.8 }}
+                      animate={{ y: 20, opacity: [0, 1, 1, 0], scale: [0.8, 1, 1, 0.6] }}
+                      transition={{ duration: 0.7, times: [0, 0.3, 0.7, 1] }}
+                    >
+                      🪨
+                    </motion.span>
+                    <motion.span
+                      className="absolute text-2xl"
+                      style={{ top: 24 }}
+                      initial={{ scale: 1 }}
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                    >
+                      🎒
+                    </motion.span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Children added so far */}
               {currentChildren.length > 0 && (
                 <div className="space-y-1.5">
                   <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                     Pieces identified ({currentChildren.length})
                   </span>
-                  {currentChildren.map(child => (
-                    <div key={child.id} className="bg-slate-800/50 rounded-lg px-3 py-2 flex items-center justify-between">
-                      <span className="text-sm text-slate-300">{child.name}</span>
-                      <span className="text-xs text-rose-400 font-mono">W:{child.weight}</span>
-                    </div>
-                  ))}
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                    {currentChildren.map(child => (
+                      <div
+                        key={child.id}
+                        className="flex flex-col items-center"
+                      >
+                        <Boulder weight={child.weight} />
+                        <span className="text-[10px] leading-tight text-slate-300 text-center mt-0.5">{child.name}</span>
+                      </div>
+                    ))}
+                  </div>
 
                   {/* Lawn moment */}
                   {(() => {
@@ -369,8 +519,10 @@ export default function DecomposeFlow() {
                 const computedWeight = activeCount > 0 ? dimensionsToWeight(pendingItem.dimensions) : 3;
                 return (
                   <div className="bg-slate-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-white font-medium">{pendingItem.name}</span>
+                    <div className="flex items-center gap-3">
+                      {/* The boulder grows/shrinks live as the user tunes dimensions. */}
+                      <Boulder weight={computedWeight} />
+                      <span className="text-sm text-white font-medium flex-1">{pendingItem.name}</span>
                       <button onClick={cancelPending} className="text-xs text-slate-600 hover:text-slate-400">cancel</button>
                     </div>
                     <p className="text-xs text-slate-500">
@@ -423,17 +575,17 @@ export default function DecomposeFlow() {
                 const addedNames = new Set(currentChildren.map(c => c.name.toLowerCase()));
                 const remaining = subSuggestions.filter(s => !addedNames.has(s.name.toLowerCase()));
                 return remaining.length > 0 ? (
-                  <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
+                  <div className="flex flex-wrap items-end gap-x-3 gap-y-2 max-h-[40vh] overflow-y-auto pr-1">
                     {remaining.map(sub => {
                       const w = dimensionsToWeight(sub.dimensions);
                       return (
                         <button
                           key={sub.name}
                           onClick={() => stageSuggestion(sub)}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-left hover:border-amber-500/30 transition-colors flex items-center justify-between"
+                          className="flex flex-col items-center hover:opacity-80 transition-opacity cursor-pointer"
                         >
-                          <span className="text-sm text-white">{sub.name}</span>
-                          <span className="text-xs text-slate-500 font-mono shrink-0 ml-2">{w}</span>
+                          <Boulder weight={w} />
+                          <span className="text-[10px] leading-tight text-white text-center mt-0.5">{sub.name}</span>
                         </button>
                       );
                     })}
@@ -480,10 +632,10 @@ export default function DecomposeFlow() {
               </p>
 
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{COMPARTMENT_META[currentChildItem.compartment].emoji}</span>
-                  <span className="text-white font-medium">{currentChildItem.name}</span>
-                  <span className="text-rose-400 font-mono text-sm ml-auto">W:{currentChildItem.weight}</span>
+                <div className="flex items-center gap-3">
+                  <Boulder weight={currentChildItem.weight} />
+                  <span className="text-white font-medium flex-1">{currentChildItem.name}</span>
+                  <span className="text-rose-400 font-mono text-sm">W:{currentChildItem.weight}</span>
                 </div>
               </div>
 
@@ -492,35 +644,63 @@ export default function DecomposeFlow() {
               </p>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleClassifyOrDeeper('deeper')}
                   className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors"
                 >
-                  <Layers size={20} className="text-amber-400 mb-2" />
+                  <span className="text-2xl mb-2 block" aria-hidden>🪨</span>
                   <span className="text-sm text-white font-medium block">Yes, unpack it</span>
                   <span className="text-[10px] text-slate-500 mt-1 block">
                     Break it into smaller pieces
                   </span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleClassifyOrDeeper('atomic')}
-                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-emerald-500/30 transition-colors"
+                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left hover:border-amber-500/30 transition-colors"
                 >
-                  <Atom size={20} className="text-emerald-400 mb-2" />
-                  <span className="text-sm text-white font-medium block">No, it's atomic</span>
-                  <span className="text-[10px] text-slate-500 mt-1 block">This is as small as it gets</span>
-                </button>
+                  <span className="text-2xl mb-2 block" aria-hidden>⏳</span>
+                  <span className="text-sm text-white font-medium block">No, it's sand</span>
+                  <span className="text-[10px] text-slate-500 mt-1 block">It's as fine as it gets</span>
+                </motion.button>
               </div>
             </div>
           )}
 
           {/* ── Classify Atomic Item ── */}
-          {step === 'classify' && classifyTargetItem && (
+          {step === 'classify' && classifyTargetItem && directionAck && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-xl p-6 text-center border ${
+                directionAck === 'internal'
+                  ? 'bg-amber-500/5 border-amber-500/30'
+                  : 'bg-sky-500/5 border-sky-500/30'
+              }`}
+            >
+              <p className={`text-sm font-medium ${directionAck === 'internal' ? 'text-amber-200' : 'text-sky-200'}`}>
+                {directionAck === 'internal'
+                  ? 'Noted — you might be close to the root.'
+                  : "Noted — we'll come back to that."}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">
+                {directionAck === 'internal'
+                  ? 'Worth staying with.'
+                  : 'Parked for a future session.'}
+              </p>
+            </motion.div>
+          )}
+
+          {step === 'classify' && classifyTargetItem && !directionAck && (
             <div className="space-y-4">
-              <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2">
-                  <Atom size={16} className="text-emerald-400" />
-                  <span className="text-white font-medium">{classifyTargetItem.name}</span>
+              <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <Boulder weight={classifyTargetItem.weight} />
+                  <span className="text-white font-medium flex-1">{classifyTargetItem.name}</span>
+                  <span className="text-base" aria-hidden>⏳</span>
                 </div>
               </div>
 
@@ -561,6 +741,33 @@ export default function DecomposeFlow() {
                 </div>
               </div>
 
+              {/* Why follow-up — direction signal. Only surfaces once the user has started answering. */}
+              {classWhy.trim().length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs text-slate-500">When you read that back, is it…</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleClassifySubmit('external')}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-left hover:border-sky-500/40 transition-colors"
+                    >
+                      <span className="text-sm text-white font-medium block">About something in my life</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">
+                        A situation, a person, a circumstance
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleClassifySubmit('internal')}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-left hover:border-amber-500/40 transition-colors"
+                    >
+                      <span className="text-sm text-white font-medium block">About me</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">
+                        A belief, a pattern, something I carry
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Coach-mark.ai CTA */}
               <a
                 href="https://coach-mark.ai"
@@ -579,7 +786,7 @@ export default function DecomposeFlow() {
                   Skip for now
                 </button>
                 <button
-                  onClick={handleClassifySubmit}
+                  onClick={() => handleClassifySubmit()}
                   className="flex-1 py-2.5 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
                 >
                   Save
@@ -596,7 +803,15 @@ export default function DecomposeFlow() {
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 200 }}
               >
-                <Layers size={40} className="text-amber-500 mx-auto mb-3" />
+                <motion.span
+                  className="text-5xl block mx-auto mb-3"
+                  initial={{ rotate: -20, y: -10 }}
+                  animate={{ rotate: 0, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 180, damping: 10 }}
+                  aria-hidden
+                >
+                  🎒
+                </motion.span>
                 <h2 className="text-lg font-medium text-white">Decomposition Complete</h2>
               </motion.div>
 
@@ -606,8 +821,8 @@ export default function DecomposeFlow() {
                   <span className="text-[10px] text-slate-500">Unpacked</span>
                 </div>
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-                  <span className="block font-mono text-2xl text-emerald-400">{atomicIds.length}</span>
-                  <span className="text-[10px] text-slate-500">Atomic</span>
+                  <span className="block font-mono text-2xl text-amber-300">{atomicIds.length}</span>
+                  <span className="text-[10px] text-slate-500">Sand</span>
                 </div>
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
                   <span className="block font-mono text-2xl text-violet-400">{classifiedIds.length}</span>
@@ -625,10 +840,10 @@ export default function DecomposeFlow() {
                     <div key={item.id} style={{ paddingLeft: depth * 16 }}>
                       <div className="flex items-center gap-2 py-1">
                         <span className="text-xs">{COMPARTMENT_META[item.compartment].emoji}</span>
-                        <span className={`text-xs ${item.isAtomic ? 'text-emerald-400' : item.isContainer ? 'text-amber-400' : 'text-slate-400'}`}>
+                        <span className={`text-xs ${item.isAtomic ? 'text-amber-300' : item.isContainer ? 'text-amber-400' : 'text-slate-400'}`}>
                           {item.name}
                         </span>
-                        {item.isAtomic && <Atom size={10} className="text-emerald-400" />}
+                        {item.isAtomic && <span className="text-[10px]" aria-hidden>⏳</span>}
                       </div>
                       {children.map(c => renderTree(c, depth + 1))}
                     </div>
