@@ -10,7 +10,7 @@ import ContextSwitcher from '../shared/ContextSwitcher';
 import { useDisplayMode } from '../shared/DisplayModeProvider';
 import GuidedPromptCard from '../shared/GuidedPromptCard';
 import { generateGuidedPrompts } from '../../utils/guidedPrompts';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AddItemModal from '../items/AddItemModal';
 
 const COMPARTMENTS: Compartment[] = ['stones', 'chains', 'tools', 'provisions', 'maps', 'souvenirs'];
@@ -47,6 +47,7 @@ function scoreLabel(score: number): string {
 
 export default function PackView() {
   const navigate = useNavigate();
+  const [now] = useState(Date.now);
   const profile = usePackStore(s => s.profile);
   const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const getContextItems = usePackStore(s => s.getContextItems);
@@ -74,7 +75,7 @@ export default function PackView() {
   const unprocessedCount = getUnprocessedItems().length;
 
   // Feature gating
-  const onboardingAge = profile.onboardingCompletedAt ? Math.floor((Date.now() - new Date(profile.onboardingCompletedAt).getTime()) / 86400000) : 999;
+  const onboardingAge = profile.onboardingCompletedAt ? Math.floor((now - new Date(profile.onboardingCompletedAt).getTime()) / 86400000) : 999;
   const setActiveContext = usePackStore(s => s.setActiveContext);
 
   // Context-filtered items — but if the switcher would be hidden, ignore context filter
@@ -83,12 +84,12 @@ export default function PackView() {
   const shouldShowContextSwitcher = uniqueContexts.size >= 2;
 
   // Reset stale context filter when switcher isn't visible
-  if (!shouldShowContextSwitcher && profile.activeContext !== null) {
-    setActiveContext(null);
-  }
+  useEffect(() => {
+    if (!shouldShowContextSwitcher && profile.activeContext !== null) setActiveContext(null);
+  }, [shouldShowContextSwitcher, profile.activeContext, setActiveContext]);
 
   const contextItems = shouldShowContextSwitcher ? getContextItems() : allActiveItems;
-  const activeParentIds = new Set(contextItems.filter(i => i.parentId).map(i => i.parentId));
+  const activeParentIds = new Set(allItems.filter(i => i.parentId).map(i => i.parentId));
   const leafItems = contextItems.filter(i => !activeParentIds.has(i.id));
   const rootItems = contextItems.filter(i => !i.parentId);
 
@@ -136,13 +137,14 @@ export default function PackView() {
             {trend === 0 && <Minus size={16} className="text-slate-500" />}
           </div>
           <span className="text-xs text-slate-500">Load Balance</span>
+          <span className="block text-xs text-slate-400">Based on your ratings</span>
           <span className={`block text-[10px] ${scoreColor(balance.score)}`}>
             {displayConfig.framingStyle === 'progress'
               ? (balance.score >= 50 ? 'Making progress' : 'Room to grow')
               : scoreLabel(balance.score)}
           </span>
           {displayConfig.showStrainWarnings && balance.strain >= 2 && (
-            <span className="text-[10px] text-rose-400">High strain detected</span>
+            <span className="text-xs text-slate-400">Recent recovery ratings are lower than usual</span>
           )}
         </div>
       </div>

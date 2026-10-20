@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { AGENTS } from '../../types';
 import type { AgentId, AgentNote } from '../../types';
-import { callAgent } from '../../utils/api';
+import { callAgent, getApiKey } from '../../utils/api';
 
 const ALL_AGENTS: (AgentId | 'all')[] = ['all', 'geologist', 'locksmith', 'blacksmith', 'quartermaster', 'navigator', 'archivist'];
 
@@ -23,7 +23,7 @@ export default function AgentFeed() {
     : agentNotes.filter(n => n.agentId === filter);
 
   const handleChat = async (note: AgentNote) => {
-    const apiKey = localStorage.getItem('packlight-api-key');
+    const apiKey = getApiKey();
     if (!apiKey) return;
 
     setChatNoteId(note.id);
@@ -31,7 +31,7 @@ export default function AgentFeed() {
   };
 
   const sendChat = async (note: AgentNote) => {
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() || chatLoading) return;
     const msg = chatInput.trim();
     setChatInput('');
     setChatMessages(prev => [...prev, { role: 'user', content: msg }]);
@@ -40,10 +40,10 @@ export default function AgentFeed() {
     try {
       const agent = AGENTS[note.agentId];
       const relatedItems = items.filter(i => note.relatedItemIds.includes(i.id));
-      const response = await callAgent(agent, msg, relatedItems.length > 0 ? relatedItems : items);
+      const response = await callAgent(agent, msg, relatedItems);
       setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Unable to reach agent. Check your API key in Settings.' }]);
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: error instanceof Error ? error.message : 'Unable to reach agent.' }]);
     } finally {
       setChatLoading(false);
     }
@@ -52,6 +52,7 @@ export default function AgentFeed() {
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <h1 className="text-xl font-semibold text-white">Agent Feed</h1>
+      <p className="text-sm text-slate-400">Review reminders are generated on your device. Optional AI chat sends your message and only the items linked to that reminder to Anthropic.</p>
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
@@ -144,7 +145,7 @@ export default function AgentFeed() {
                           >
                             <X size={12} /> Dismiss
                           </button>
-                          {localStorage.getItem('packlight-api-key') && (
+                          {getApiKey() && (
                             <button
                               onClick={() => handleChat(note)}
                               className="flex items-center gap-1 px-2.5 py-1 bg-violet-500/20 text-violet-400 rounded text-xs hover:bg-violet-500/30"

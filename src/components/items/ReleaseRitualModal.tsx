@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META } from '../../types';
 import type { PackItem } from '../../types';
+import { useDialog } from '../shared/useDialog';
 
 interface Props {
   item: PackItem;
@@ -46,6 +47,7 @@ const RELEASE_PROMPTS: Record<string, string[]> = {
 };
 
 export default function ReleaseRitualModal({ item, onClose, onComplete }: Props) {
+  const dialog = useDialog(onClose);
   const dropItem = usePackStore(s => s.dropItem);
   const meta = COMPARTMENT_META[item.compartment];
   const prompts = RELEASE_PROMPTS[item.compartment];
@@ -72,11 +74,16 @@ export default function ReleaseRitualModal({ item, onClose, onComplete }: Props)
         onClick={onClose}
       >
         <motion.div
+          ref={dialog}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Release item"
+          tabIndex={-1}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={e => e.stopPropagation()}
-          className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden"
+          className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-md max-h-[85dvh] overflow-y-auto"
         >
           {/* Released state */}
           {released ? (
@@ -99,7 +106,7 @@ export default function ReleaseRitualModal({ item, onClose, onComplete }: Props)
                 transition={{ delay: 0.8 }}
                 className="text-slate-400 text-sm italic"
               >
-                The wound that's released heals.
+                You've set this down for now. You can restore it from Trail.
               </motion.p>
               <motion.p
                 initial={{ opacity: 0 }}
@@ -163,7 +170,7 @@ export default function ReleaseRitualModal({ item, onClose, onComplete }: Props)
                       <textarea
                         value={releaseNote}
                         onChange={e => setReleaseNote(e.target.value)}
-                        placeholder="Speak it here... (optional, but witnessed words carry power)"
+                        placeholder="Add a private note, if you want to..."
                         rows={4}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-700 focus:outline-none focus:border-amber-500/30 resize-none"
                         autoFocus

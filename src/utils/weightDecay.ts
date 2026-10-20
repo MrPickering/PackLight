@@ -17,27 +17,21 @@ function makeNote(agentId: AgentNote['agentId'], content: string, itemId: string
 }
 
 export function runWeightDecay(items: PackItem[]): { updatedItems: PackItem[]; newNotes: AgentNote[] } {
-  const now = new Date().toISOString();
   const allNotes: AgentNote[] = [];
 
   const updatedItems = items.map(item => {
     if (item.droppedAt || item.isContainer) return item;
     const days = daysSince(item.updatedAt);
-    const copy = { ...item };
 
     switch (item.compartment) {
       case 'stones':
         if (days >= 30) {
-          copy.weight = Math.min(10, item.weight + 0.5);
-          copy.weightHistory = [...item.weightHistory, { date: now, value: copy.weight }];
-          allNotes.push(makeNote('geologist', `"${item.name}" hasn't been addressed in ${days} days. Its weight has grown slightly — avoidance has a cost. Consider giving this some attention.`, item.id));
+          allNotes.push(makeNote('geologist', `It's been ${days} days since you revisited "${item.name}". If it feels useful, check whether your rating still fits. There's no deadline.`, item.id));
         }
         break;
       case 'tools':
         if (days >= 60) {
-          copy.utility = Math.max(1, item.utility - 0.3);
-          copy.utilityHistory = [...item.utilityHistory, { date: now, value: copy.utility }];
-          allNotes.push(makeNote('blacksmith', `Your "${item.name}" ability hasn't been used in ${days} days. Skills lose sharpness without practice — utility has decreased slightly.`, item.id));
+          allNotes.push(makeNote('blacksmith', `Would you like to revisit "${item.name}"? Your last rating is unchanged; only you know how useful it feels today.`, item.id));
         }
         break;
       case 'maps':
@@ -47,12 +41,12 @@ export function runWeightDecay(items: PackItem[]): { updatedItems: PackItem[]; n
         break;
       case 'souvenirs':
         if (days >= 45) {
-          allNotes.push(makeNote('archivist', `You haven't revisited "${item.name}" in ${days} days. The parts of your identity that matter need regular attention.`, item.id));
+          allNotes.push(makeNote('archivist', `If you'd like, take a moment to reflect on what "${item.name}" means to you today.`, item.id));
         }
         break;
     }
 
-    return copy;
+    return item;
   });
 
   return { updatedItems, newNotes: allNotes };

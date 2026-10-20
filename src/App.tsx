@@ -1,18 +1,24 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { App as NativeApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { localDay } from './utils/dates';
+import { StorageNotice } from './components/shared/AppRecovery';
 import { usePackStore } from './store';
 import Layout from './components/layout/Layout';
 import PackView from './components/pack/PackView';
-import CompartmentDetail from './components/pack/CompartmentDetail';
 import JournalPage from './components/journal/JournalPage';
 import AgentFeed from './components/agents/AgentFeed';
-import TrailMap from './components/trail/TrailMap';
 import RepackMode from './components/repack/RepackMode';
 import DecomposeFlow from './components/decompose/DecomposeFlow';
 import SettingsPage from './components/settings/SettingsPage';
 import Onboarding from './components/onboarding/Onboarding';
 import FirstSteps from './components/onboarding/FirstSteps';
 import DisplayModeProvider from './components/shared/DisplayModeProvider';
+import PrivacyPage from './components/settings/PrivacyPage';
+
+const CompartmentDetail = lazy(() => import('./components/pack/CompartmentDetail'));
+const TrailMap = lazy(() => import('./components/trail/TrailMap'));
 
 function HomeRoute() {
   const firstStepsComplete = usePackStore(s => s.profile.firstStepsComplete);
@@ -25,6 +31,7 @@ export default function App() {
   const getLoadBalance = usePackStore(s => s.getLoadBalance);
   const profile = usePackStore(s => s.profile);
   const setProfile = usePackStore(s => s.setProfile);
+  const items = usePackStore(s => s.items);
 
   // Run weight decay check on app open
   useEffect(() => {
@@ -33,25 +40,32 @@ export default function App() {
 
   // Record load balance periodically
   useEffect(() => {
+    if (!onboardingComplete) return;
     const { score } = getLoadBalance();
-    const last = profile.loadBalanceHistory[profile.loadBalanceHistory.length - 1];
-    const today = new Date().toISOString().split('T')[0];
-    if (!last || last.date.split('T')[0] !== today) {
-      setProfile({
-        loadBalanceHistory: [...profile.loadBalanceHistory, { date: new Date().toISOString(), value: score }],
-      });
-    }
-  }, [getLoadBalance, profile.loadBalanceHistory, setProfile]);
+    const history = usePackStore.getState().profile.loadBalanceHistory;
+    const today = localDay();
+    setProfile({ loadBalanceHistory: [...history.filter(entry => localDay(entry.date) !== today), { date: new Date().toISOString(), value: score }] });
+  }, [getLoadBalance, items, profile.currentTerrain, profile.recoveryHistory, onboardingComplete, setProfile]);
 
-  if (!onboardingComplete) {
-    return <Onboarding />;
-  }
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = NativeApp.addListener('backButton', () => {
+      if (document.querySelector('[aria-modal="true"]')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      } else if (window.location.hash && window.location.hash !== '#/') window.history.back();
+      else void NativeApp.minimizeApp();
+    });
+    return () => { void listener.then(handle => handle.remove()); };
+  }, []);
 
   return (
     <DisplayModeProvider>
-      <BrowserRouter>
+      <StorageNotice />
+      <HashRouter>
+        <Suspense fallback={<p role="status" className="p-6">Opening your pack…</p>}>
         <Routes>
-          <Route element={<Layout />}>
+          <Route path="/privacy" element={<PrivacyPage />} />
+          {!onboardingComplete ? <Route path="*" element={<Onboarding />} /> : <Route element={<Layout />}>
             <Route path="/" element={<HomeRoute />} />
             <Route path="/pack/:compartment" element={<CompartmentDetail />} />
             <Route path="/journal" element={<JournalPage />} />
@@ -61,9 +75,11 @@ export default function App() {
             <Route path="/decompose" element={<DecomposeFlow />} />
             <Route path="/decompose/:itemId" element={<DecomposeFlow />} />
             <Route path="/settings" element={<SettingsPage />} />
-          </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>}
         </Routes>
-      </BrowserRouter>
+        </Suspense>
+      </HashRouter>
     </DisplayModeProvider>
   );
 }

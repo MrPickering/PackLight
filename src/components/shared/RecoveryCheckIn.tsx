@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { useDisplayMode } from './DisplayModeProvider';
+import { localDay } from '../../utils/dates';
 
 const DIMENSIONS = [
   { key: 'sleep', label: 'Sleep' },
@@ -24,8 +25,8 @@ export default function RecoveryCheckIn() {
   const [saved, setSaved] = useState(false);
 
   // Don't show if already checked in today or in minimal display modes
-  const today = new Date().toISOString().split('T')[0];
-  const checkedInToday = recoveryHistory.some(c => c.date.split('T')[0] === today);
+  const today = localDay();
+  const checkedInToday = recoveryHistory.some(c => localDay(c.date) === today);
 
   if (dismissed || checkedInToday || saved || displayConfig.framingStyle === 'minimal') return null;
 

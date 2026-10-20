@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Send, Loader2, Check, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePackStore } from '../../store';
-import { analyzeJournal } from '../../utils/api';
+import { analyzeJournal, getApiKey } from '../../utils/api';
 import type { DetectedItem } from '../../types';
 
 const MOODS = ['😫', '😔', '😐', '🙂', '😊'];
@@ -17,9 +17,15 @@ export default function JournalPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
   const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  const [status, setStatus] = useState('');
+  const busy = useRef(false);
 
-  const handleSubmit = async () => {
-    if (!content.trim()) return;
+  const handleSubmit = async (withAI = false) => {
+    if (!content.trim() || busy.current) return;
+    busy.current = true;
+    setDetectedItems([]);
+    setDismissed(new Set());
 
     const entry = {
       content: content.trim(),
@@ -30,14 +36,17 @@ export default function JournalPage() {
     addJournalEntry(entry);
     const latestEntry = usePackStore.getState().journal[0];
     setCurrentEntryId(latestEntry.id);
+    setContent('');
+    setMood(3);
+    setStatus('Journal entry saved on this device.');
 
     // Try to analyze with API
-    const apiKey = localStorage.getItem('packlight-api-key');
-    if (apiKey) {
+    const apiKey = getApiKey();
+    if (apiKey && withAI) {
       setAnalyzing(true);
       try {
         const items = await analyzeJournal(content, mood);
-        const detected = items.map(i => ({ ...i, approved: false } as DetectedItem));
+        const detected = items.map(i => ({ ...i, approved: false }));
         setDetectedItems(detected);
 
         // Update journal entry with detected items
@@ -46,15 +55,14 @@ export default function JournalPage() {
           e.id === latestEntry.id ? { ...e, detectedItems: detected } : e,
         );
         usePackStore.setState({ journal: updatedJournal });
-      } catch {
-        // Silently fail - journal still saved
+      } catch (error) {
+        setStatus(`Entry saved. ${error instanceof Error ? error.message : 'AI analysis failed.'}`);
       } finally {
         setAnalyzing(false);
       }
     }
 
-    setContent('');
-    setMood(3);
+    busy.current = false;
   };
 
   const handleApprove = (index: number) => {
@@ -64,18 +72,22 @@ export default function JournalPage() {
   };
 
   const handleDismiss = (index: number) => {
-    setDetectedItems(prev => prev.filter((_, i) => i !== index));
+    setDismissed(prev => new Set([...prev, index]));
   };
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <h1 className="text-xl font-semibold text-white">Journal</h1>
+      {status && <p role="status" className="text-sm text-slate-300">{status}</p>}
+      {!!getApiKey() && <p className="text-sm text-slate-400">Save Entry stays on this device. Save &amp; Analyze sends this entry and mood to Anthropic.</p>}
 
       {/* Writing area */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
         <div className="text-xs text-slate-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
 
         <textarea
+          aria-label="Journal entry"
+          maxLength={100000}
           value={content}
           onChange={e => setContent(e.target.value)}
           placeholder="What's on your mind? What are you carrying today?"
@@ -89,6 +101,8 @@ export default function JournalPage() {
             {MOODS.map((emoji, i) => (
               <button
                 key={i}
+                aria-label={`Mood ${i + 1} of 5`}
+                aria-pressed={mood === i + 1}
                 onClick={() => setMood(i + 1)}
                 className={`text-lg p-1 rounded transition-all ${
                   mood === i + 1 ? 'scale-125 bg-slate-800' : 'opacity-40 hover:opacity-70'
@@ -100,9 +114,9 @@ export default function JournalPage() {
           </div>
 
           <div className="flex gap-2">
-            {localStorage.getItem('packlight-api-key') && (
+            {getApiKey() && (
               <button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit(true)}
                 disabled={!content.trim() || analyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg text-sm font-medium hover:bg-violet-400 transition-colors disabled:opacity-40"
               >
@@ -110,10 +124,10 @@ export default function JournalPage() {
                 {analyzing ? 'Analyzing...' : 'Save & Analyze'}
               </button>
             )}
-            {!localStorage.getItem('packlight-api-key') && (
+            {(
               <button
-                onClick={handleSubmit}
-                disabled={!content.trim()}
+                onClick={() => handleSubmit()}
+                disabled={!content.trim() || analyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-slate-950 rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors disabled:opacity-40"
               >
                 <Send size={14} /> Save Entry
@@ -127,7 +141,7 @@ export default function JournalPage() {
       {detectedItems.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-sm font-medium text-violet-400">Detected Pack Items</h2>
-          {detectedItems.map((item, i) => (
+          {detectedItems.map((item, i) => dismissed.has(i) ? null : (
             <motion.div
               key={i}
               initial={{ opacity: 0, x: -20 }}
@@ -148,12 +162,14 @@ export default function JournalPage() {
               {!item.approved && (
                 <div className="flex gap-1">
                   <button
+                    aria-label={`Add ${item.name}`}
                     onClick={() => handleApprove(i)}
                     className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30"
                   >
                     <Check size={14} />
                   </button>
                   <button
+                    aria-label={`Dismiss ${item.name}`}
                     onClick={() => handleDismiss(i)}
                     className="p-1.5 bg-slate-800 text-slate-500 rounded-lg hover:bg-slate-700"
                   >
@@ -169,7 +185,7 @@ export default function JournalPage() {
         </div>
       )}
 
-      {!localStorage.getItem('packlight-api-key') && (
+      {!getApiKey() && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 text-center">
           <p className="text-sm text-slate-500">Configure your API key in Settings to enable AI-powered journal analysis.</p>
         </div>

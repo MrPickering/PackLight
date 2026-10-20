@@ -8,6 +8,7 @@ import { TOP_LEVEL_CATEGORIES, WEIGHT_PRESETS, dimensionsToWeight } from '../../
 import type { TopLevelCategory, SubItemSuggestion } from '../../types/suggestions';
 import Slider from '../shared/Slider';
 import ReleaseRitualModal from './ReleaseRitualModal';
+import { useDialog } from '../shared/useDialog';
 
 interface Props {
   onClose: () => void;
@@ -55,7 +56,7 @@ function EditForm({ editItem, onClose }: { editItem: PackItem; onClose: () => vo
       <form onSubmit={handleSubmit} className="p-4 space-y-5">
         <div>
           <label className="block text-sm text-slate-400 mb-1.5">Name</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)}
+          <input type="text" aria-label="Item name" maxLength={500} value={name} onChange={e => setName(e.target.value)}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50" autoFocus />
         </div>
         <div>
@@ -96,12 +97,12 @@ function EditForm({ editItem, onClose }: { editItem: PackItem; onClose: () => vo
         </div>
         <div>
           <label className="block text-sm text-slate-400 mb-1.5">Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
+          <textarea aria-label="Item description" maxLength={100000} value={description} onChange={e => setDescription(e.target.value)} rows={2}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50 resize-none" />
         </div>
         <div>
           <label className="block text-sm text-slate-400 mb-1.5">Tags</label>
-          <input type="text" value={tags} onChange={e => setTags(e.target.value)} placeholder="comma-separated..."
+          <input type="text" aria-label="Tags" maxLength={1000} value={tags} onChange={e => setTags(e.target.value)} placeholder="comma-separated..."
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50" />
         </div>
         {availableContexts.length > 0 && (
@@ -322,6 +323,7 @@ function GuidedAddFlow({ onClose, parentId, parentName, defaultCompartment }: {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  maxLength={500}
                   value={customText}
                   onChange={e => setCustomText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCustomSubmit()}
@@ -350,6 +352,7 @@ function GuidedAddFlow({ onClose, parentId, parentName, defaultCompartment }: {
               </div>
               <input
                 type="text"
+                maxLength={500}
                 value={customText}
                 onChange={e => setCustomText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCustomSubmit()}
@@ -374,6 +377,7 @@ function GuidedAddFlow({ onClose, parentId, parentName, defaultCompartment }: {
 
 // ─── Main modal wrapper ───
 export default function AddItemModal({ onClose, editItem, defaultCompartment, parentId, parentName }: Props) {
+  const dialog = useDialog(onClose);
   return (
     <AnimatePresence>
       <motion.div
@@ -384,6 +388,11 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
         onClick={onClose}
       >
         <motion.div
+          ref={dialog}
+          role="dialog"
+          aria-modal="true"
+          aria-label={editItem ? 'Edit Item' : 'Add to Pack'}
+          tabIndex={-1}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
@@ -394,7 +403,7 @@ export default function AddItemModal({ onClose, editItem, defaultCompartment, pa
             <h2 className="text-lg font-semibold text-white">
               {editItem ? 'Edit Item' : parentId ? 'Unpack: What\'s Inside?' : 'Add to Pack'}
             </h2>
-            <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+            <button aria-label="Close dialog" onClick={onClose} className="text-slate-500 hover:text-slate-300">
               <X size={20} />
             </button>
           </div>

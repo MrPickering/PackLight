@@ -12,7 +12,7 @@ const TERRAIN_MULTIPLIER: Record<TerrainType, number> = {
 export function calculatePaceScore(items: PackItem[], terrain: TerrainType): number {
   const activeItems = items.filter(i => !i.droppedAt);
   // Use leaf items only to avoid double-counting parents and children
-  const activeIds = new Set(activeItems.filter(i => i.parentId).map(i => i.parentId));
+  const activeIds = new Set(items.filter(i => i.parentId).map(i => i.parentId));
   const leafItems = activeItems.filter(i => !activeIds.has(i.id));
   const totalWeight = leafItems.reduce((sum, i) => sum + i.weight, 0);
   const totalUtility = leafItems.reduce((sum, i) => sum + i.utility, 0);

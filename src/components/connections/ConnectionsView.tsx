@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link2, Filter } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
 import { COMPARTMENT_META } from '../../types';
