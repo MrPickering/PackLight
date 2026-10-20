@@ -112,7 +112,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="w-full min-h-screen flex flex-col items-center justify-center p-4">
       {/* Progress bar */}
       {step !== 'welcome' && (
         <div className="w-full max-w-lg mb-6">
