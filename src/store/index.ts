@@ -1,10 +1,13 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { PackItem, AgentNote, JournalEntry, UserProfile, Compartment, TerrainType, RecoveryCheck, DisplayMode, LifeContext, FirstStepsStep, ItemClassification } from '../types';
 import { DEFAULT_CONTEXTS } from '../types';
 import { calculatePaceScore } from '../utils/paceScore';
 import { calculateLoadBalance } from '../utils/loadBalance';
 import { runWeightDecay } from '../utils/weightDecay';
+import { packDataSchema } from '../utils/backup';
+import { packStorage, setHydrationError } from '../utils/storage';
+import { localDay } from '../utils/dates';
 
 function dimensionsToWeight(d: PackItem['weightDimensions']): number {
   if (!d) return 0;
@@ -116,6 +119,9 @@ export const usePackStore = create<PackStore>()(
       addItem: (itemData) => {
         const now = new Date().toISOString();
         const parentId = itemData.parentId ?? null;
+        const parent = parentId ? get().items.find(i => i.id === parentId && !i.droppedAt) : null;
+        if (parentId && (!parent || get().getItemDepth(parentId) >= 49)) return;
+        if (!itemData.name.trim()) return;
 
         const weight = itemData.weightDimensions
           ? dimensionsToWeight(itemData.weightDimensions)
@@ -134,7 +140,7 @@ export const usePackStore = create<PackStore>()(
           originalWeight: weight,
           originalUtility: itemData.utility,
           weight,
-          contexts: itemData.contexts ?? [],
+          contexts: itemData.contexts ?? parent?.contexts ?? [],
           weightHistory: [{ date: now, value: weight }],
           utilityHistory: [{ date: now, value: itemData.utility }],
         };
@@ -197,7 +203,7 @@ export const usePackStore = create<PackStore>()(
 
         set(state => ({
           items: state.items.map(item => {
-            if (dropIds.has(item.id)) {
+            if (dropIds.has(item.id) && !item.droppedAt) {
               return { ...item, droppedAt: now, updatedAt: now, ...(item.id === id && releaseNote ? { releaseNote } : {}) };
             }
             // If not cascading, orphan children to root
@@ -211,8 +217,10 @@ export const usePackStore = create<PackStore>()(
 
       restoreItem: (id) => {
         const now = new Date().toISOString();
+        const target = get().items.find(item => item.id === id);
+        if (!target?.droppedAt) return;
         const descendants = get().getDescendants(id);
-        const restoreIds = new Set([id, ...descendants.map(d => d.id)]);
+        const restoreIds = new Set([id, ...descendants.filter(d => d.droppedAt === target.droppedAt).map(d => d.id), ...get().getItemAncestors(id).map(a => a.id)]);
 
         set(state => ({
           items: state.items.map(item =>
@@ -376,7 +384,7 @@ export const usePackStore = create<PackStore>()(
         set(state => ({
           profile: {
             ...state.profile,
-            recoveryHistory: [...state.profile.recoveryHistory, recovery],
+            recoveryHistory: [...state.profile.recoveryHistory.filter(c => localDay(c.date) !== localDay(check.date)), recovery],
           },
         }));
       },
@@ -425,6 +433,7 @@ export const usePackStore = create<PackStore>()(
 
       removeContext: (contextId) => {
         set(state => ({
+          items: state.items.map(item => ({ ...item, contexts: item.contexts.filter(id => id !== contextId) })),
           profile: {
             ...state.profile,
             contexts: state.profile.contexts.filter(c => c.id !== contextId),
@@ -455,7 +464,7 @@ export const usePackStore = create<PackStore>()(
         const children = state.items.filter(i => i.parentId === itemId && !i.droppedAt);
         if (children.length === 0) {
           const item = state.items.find(i => i.id === itemId);
-          return item?.weight ?? 0;
+          return item?.droppedAt || state.items.some(i => i.parentId === itemId) ? 0 : item?.weight ?? 0;
         }
         return children.reduce((sum, child) => sum + state.getEffectiveWeight(child.id), 0);
       },
@@ -465,7 +474,7 @@ export const usePackStore = create<PackStore>()(
         const children = state.items.filter(i => i.parentId === itemId && !i.droppedAt);
         if (children.length === 0) {
           const item = state.items.find(i => i.id === itemId);
-          return item?.utility ?? 0;
+          return item?.droppedAt || state.items.some(i => i.parentId === itemId) ? 0 : item?.utility ?? 0;
         }
         return children.reduce((sum, child) => sum + state.getEffectiveUtility(child.id), 0);
       },
@@ -508,7 +517,7 @@ export const usePackStore = create<PackStore>()(
 
       getLeafItems: () => {
         const items = get().items.filter(i => !i.droppedAt);
-        const parentIds = new Set(items.map(i => i.parentId).filter(Boolean));
+        const parentIds = new Set(get().items.map(i => i.parentId).filter(Boolean));
         return items.filter(i => !parentIds.has(i.id));
       },
 
@@ -534,7 +543,7 @@ export const usePackStore = create<PackStore>()(
       getCompartmentStats: (compartment) => {
         // Use leaf items only to avoid double-counting
         const allActive = get().items.filter(i => !i.droppedAt);
-        const parentIds = new Set(allActive.filter(i => i.parentId).map(i => i.parentId));
+        const parentIds = new Set(get().items.filter(i => i.parentId).map(i => i.parentId));
         const leafItems = allActive.filter(i => i.compartment === compartment && !parentIds.has(i.id));
         return {
           count: allActive.filter(i => i.compartment === compartment).length,
@@ -561,7 +570,12 @@ export const usePackStore = create<PackStore>()(
     {
       name: 'packlight-store',
       version: 6,
+      storage: createJSONStorage(() => packStorage),
+      skipHydration: true,
+      merge: (persisted, current) => persisted == null ? current : ({ ...current, ...packDataSchema.parse(persisted) }),
+      onRehydrateStorage: () => (_state, error) => setHydrationError(error),
       migrate: (persisted: unknown, version: number) => {
+        if (version > 6) throw new Error('This pack was saved by a newer version of PackLight.');
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
           const profile = state.profile as Record<string, unknown>;

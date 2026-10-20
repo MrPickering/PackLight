@@ -112,7 +112,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="w-full min-h-screen flex flex-col items-center justify-center p-4">
       {/* Progress bar */}
       {step !== 'welcome' && (
         <div className="w-full max-w-lg mb-6">
@@ -165,8 +165,9 @@ export default function Onboarding() {
                     </div>
                   </div>
                   <p className="text-xs text-slate-600 pt-2">
-                    A second brain for what weighs on you. Informed by Holmes-Rahe, allostatic load theory, and conservation of resources research.
+                    A private reflection tool, not a medical assessment. Ratings are your own impressions. Core features stay on this device; optional AI requires your choice in Settings.
                   </p>
+                  <a href="#/privacy" className="text-sm text-amber-400 underline">Privacy and data storage</a>
                 </div>
                 <button
                   onClick={goNext}

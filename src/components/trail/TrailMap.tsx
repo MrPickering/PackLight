@@ -22,8 +22,10 @@ export default function TrailMap() {
   const profile = usePackStore(s => s.profile);
   const setTerrain = usePackStore(s => s.setTerrain);
   const items = usePackStore(s => s.items);
+  const restoreItem = usePackStore(s => s.restoreItem);
   const getCompartmentItems = usePackStore(s => s.getCompartmentItems);
   const displayConfig = useDisplayMode();
+  const [now] = useState(Date.now);
   const [range, setRange] = useState(30);
   const [tab, setTab] = useState<Tab>('journey');
 
@@ -32,7 +34,8 @@ export default function TrailMap() {
     new Date(b.droppedAt!).getTime() - new Date(a.droppedAt!).getTime(),
   );
 
-  const totalDroppedWeight = droppedItems.reduce((s, i) => s + i.weight, 0);
+  const parentIds = new Set(items.map(i => i.parentId));
+  const totalDroppedWeight = droppedItems.filter(i => !parentIds.has(i.id)).reduce((s, i) => s + i.weight, 0);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - range);
@@ -78,7 +81,7 @@ export default function TrailMap() {
         </h2>
         {maps.length > 0 ? (
           maps.map(goal => {
-            const daysSinceCreated = Math.floor((Date.now() - new Date(goal.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            const daysSinceCreated = Math.floor((now - new Date(goal.createdAt).getTime()) / (1000 * 60 * 60 * 24));
             const progress = Math.min(100, Math.round((goal.utility / 10) * 100));
             const connectedTools = tools.filter(t =>
               t.tags.some(tag => goal.tags.includes(tag)) || goal.description.toLowerCase().includes(t.name.toLowerCase()),
@@ -96,7 +99,7 @@ export default function TrailMap() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-white font-medium text-sm">{goal.name}</span>
-                  <span className="font-mono text-xs text-violet-400">{progress}%</span>
+                  <span className="font-mono text-xs text-violet-400">Value {goal.utility}/10</span>
                 </div>
                 <div className="h-1 bg-slate-800 rounded-full overflow-hidden mb-3">
                   <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -207,7 +210,7 @@ export default function TrailMap() {
                     <span className="text-sm text-slate-400">{item.name}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-emerald-400 font-mono">-{item.weight}</span>
+                    {!parentIds.has(item.id) && <span className="text-emerald-400 font-mono">-{item.weight}</span>}
                     <span className="text-slate-600">{new Date(item.droppedAt!).toLocaleDateString()}</span>
                   </div>
                 </div>
@@ -216,6 +219,7 @@ export default function TrailMap() {
                     "{item.releaseNote}"
                   </p>
                 )}
+                <button onClick={() => restoreItem(item.id)} className="text-sm text-amber-400 px-2 py-2">Restore {item.name}</button>
               </div>
             ))}
           </div>

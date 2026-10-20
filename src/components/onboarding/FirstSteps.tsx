@@ -8,7 +8,7 @@ const TOTAL_STEPS = 4;
 
 export default function FirstSteps() {
   const profile = usePackStore(s => s.profile);
-  const items = usePackStore(s => s.items);
+  usePackStore(s => s.items);
   const getActiveItems = usePackStore(s => s.getActiveItems);
   const getChildItems = usePackStore(s => s.getChildItems);
   const getAtomicItems = usePackStore(s => s.getAtomicItems);
@@ -273,7 +273,7 @@ export default function FirstSteps() {
                 </motion.span>
                 <span className="text-xs text-slate-500 block mt-2">out of 100</span>
                 <p className="text-sm text-slate-400 mt-4">
-                  Higher = more sustainable. This updates as you decompose items, classify them, and check in on recovery.
+                  A personal reflection score based on your ratings, not a health measurement. It changes as you adjust your items and recovery check-ins.
                 </p>
               </div>
 

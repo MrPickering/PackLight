@@ -11,7 +11,8 @@ const CAPACITY_MODIFIER: Record<TerrainType, number> = {
 
 function recoveryScore(checks: RecoveryCheck[]): number {
   if (checks.length === 0) return 5; // neutral default
-  const latest = checks[checks.length - 1];
+  const latest = checks.reduce((a, b) => Date.parse(a.date) > Date.parse(b.date) ? a : b);
+  if (Date.now() - Date.parse(latest.date) > 7 * 86400000) return 5;
   const raw = latest.sleep + latest.activity + latest.social + latest.downtime + latest.mindfulness;
   return (raw - 5) / 2; // maps 5-25 to 0-10
 }
@@ -23,8 +24,8 @@ function calculateStrain(checks: RecoveryCheck[]): number {
   const weekMs = 7 * 24 * 60 * 60 * 1000;
   const monthMs = 28 * 24 * 60 * 60 * 1000;
 
-  const recentChecks = checks.filter(c => now - new Date(c.date).getTime() <= weekMs);
-  const longerChecks = checks.filter(c => now - new Date(c.date).getTime() <= monthMs);
+  const recentChecks = checks.filter(c => now >= Date.parse(c.date) && now - Date.parse(c.date) <= weekMs);
+  const longerChecks = checks.filter(c => now >= Date.parse(c.date) && now - Date.parse(c.date) <= monthMs);
 
   if (recentChecks.length === 0 || longerChecks.length === 0) return 0;
 
@@ -37,9 +38,8 @@ function calculateStrain(checks: RecoveryCheck[]): number {
 
   const acwr = acute / chronic;
 
-  // Gabbett's zones: 0.8-1.3 is safe. Outside that = strain
-  if (acwr > 1.5) return 3;  // high strain
-  if (acwr > 1.3) return 1.5; // moderate strain
+  // A personal reflection heuristic, not a clinical or athletic risk model.
+  // Higher recovery ratings must never incur an overload penalty.
   if (acwr < 0.8) return 2;  // underrecovery strain
   return 0;
 }
@@ -51,7 +51,7 @@ export function calculateLoadBalance(
 ): { score: number; recovery: number; strain: number } {
   const activeItems = items.filter(i => !i.droppedAt);
   // Use leaf items only to avoid double-counting parents and children
-  const activeIds = new Set(activeItems.filter(i => i.parentId).map(i => i.parentId));
+  const activeIds = new Set(items.filter(i => i.parentId).map(i => i.parentId));
   const leafItems = activeItems.filter(i => !activeIds.has(i.id));
   const totalWeight = leafItems.reduce((sum, i) => sum + i.weight, 0);
   const totalUtility = leafItems.reduce((sum, i) => sum + i.utility, 0);

@@ -72,6 +72,8 @@ const DisplayModeContext = createContext<DisplayModeConfig>({
   ...MODE_CONFIGS.default,
 });
 
+// This context hook intentionally lives with its provider.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDisplayMode() {
   return useContext(DisplayModeContext);
 }

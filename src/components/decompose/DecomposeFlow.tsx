@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, Layers, Atom, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePackStore } from '../../store';
-import { COMPARTMENT_META, LIGHTENING_STRATEGIES, DIMENSION_LABELS } from '../../types';
+import { COMPARTMENT_META, DIMENSION_LABELS } from '../../types';
 import type { PackItem, Compartment, WeightDimensions } from '../../types';
 import { TOP_LEVEL_CATEGORIES, dimensionsToWeight } from '../../types/suggestions';
 import type { SubItemSuggestion } from '../../types/suggestions';
@@ -446,6 +446,7 @@ export default function DecomposeFlow() {
                 <div className="flex gap-2">
                   <input
                     type="text"
+                    maxLength={500}
                     value={customText}
                     onChange={e => setCustomText(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && stageCustom()}

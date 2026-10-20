@@ -14,7 +14,7 @@ interface GuidedPromptsInput {
 }
 
 export function generateGuidedPrompts(input: GuidedPromptsInput): GuidedPrompt[] {
-  const { items, profile, loadBalanceScore, framingStyle } = input;
+  const { items, profile, framingStyle } = input;
 
   if (framingStyle === 'minimal') return [];
 

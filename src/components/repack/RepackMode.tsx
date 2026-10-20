@@ -25,7 +25,6 @@ export default function RepackMode() {
   const agentNotes = usePackStore(s => s.agentNotes);
   const profile = usePackStore(s => s.profile);
   const setTerrain = usePackStore(s => s.setTerrain);
-  const dropItem = usePackStore(s => s.dropItem);
   const setLighteningApproach = usePackStore(s => s.setLighteningApproach);
   const setNextStep = usePackStore(s => s.setNextStep);
   const classifyItem = usePackStore(s => s.classifyItem);
@@ -46,7 +45,7 @@ export default function RepackMode() {
   const [classifiedCount, setClassifiedCount] = useState(0);
 
   const activeItems = items.filter(i => !i.droppedAt);
-  const recoveryHistory = profile.recoveryHistory ?? [];
+  const recoveryHistory = profile.recoveryHistory;
   const initialScore = calculateLoadBalance(items, profile.currentTerrain, recoveryHistory).score;
 
   // Review: ALL items grouped by compartment

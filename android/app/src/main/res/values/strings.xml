@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PackLight</string>
+    <string name="title_activity_main">PackLight</string>
+    <string name="package_name">ai.pickbits.packlight</string>
+    <string name="custom_url_scheme">ai.pickbits.packlight</string>
+</resources>

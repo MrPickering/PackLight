@@ -23,7 +23,7 @@ npm run dev
 
 - **PackItem** — Everything you carry. Has weight (energy cost) and utility (value). Can be nested (parent/child).
 - **Compartments** — Six categories: Emotions, Responsibilities, Abilities, Resources, Goals, Identity.
-- **Weight Dimensions** — Sub-items are rated across stress, worry, mental load, urgency, and emotional charge (1-5 each).
+- **Weight Dimensions** — Sub-items are rated across stress, worry, mental load, urgency, and emotional charge (0 for unrated, 1-5 otherwise).
 - **Load Balance** — Score (0-100) combining demands, resources, recovery, capacity, and strain.
 - **Recovery Check-ins** — Daily micro check-ins (sleep, activity, social, downtime, reflection).
 - **Contexts** — Filtered views for different life scenarios (work, home, social, creative).
@@ -37,7 +37,7 @@ src/
   store/index.ts        — Zustand store, actions, computed helpers
   utils/
     loadBalance.ts      — Load Balance formula
-    weightDecay.ts      — Time-based weight changes
+    weightDecay.ts      — Time-based review reminders (ratings stay unchanged)
     autoCategorize.ts   — Keyword-based item categorization
     api.ts              — AI features (optional, requires API key)
   components/
@@ -58,7 +58,7 @@ PackLight's data model is designed for external integration:
 
 ### Data access
 
-All state lives in a single Zustand store persisted to localStorage under `packlight-store`. The `PackItem` type includes:
+State lives in a single Zustand store persisted under `packlight-store`: localStorage on web and Capacitor Preferences on mobile. Hydration is validated before rendering. The `PackItem` type includes:
 
 - `metadata: Record<string, unknown>` — Extensible key-value store for integration data
 - `sourceRef: string` — Reference to external data source (e.g., `gcal:event-123`, `obsidian:note-path`)
@@ -83,7 +83,7 @@ The `sourceRef` field links items to external sources. An integration would:
 
 ### AI features
 
-AI features (agent conversations, journal analysis) are optional. They require an Anthropic API key stored in localStorage. The app works fully without AI — all core features (items, weights, recovery, contexts) are local-only.
+AI features (agent conversations, journal analysis) are optional. They require an Anthropic API key held only in memory after explicit session consent. The app works fully without AI — all core features (items, weights, recovery, contexts) are local-only.
 
 ## Display Modes
 
@@ -101,13 +101,13 @@ These are different information density and navigation patterns, not visual them
 
 - Keep the core dependency-free (no backend, no accounts, no tracking)
 - AI features must always be optional
-- Respect that this tool handles sensitive personal data — it never leaves the browser
+- Respect that this tool handles sensitive personal data — it stays on-device unless the user exports it or explicitly requests optional AI processing
 - Test with the "would this make someone anxious?" filter — if showing a number or message could increase stress rather than reduce it, reconsider
 - The app's value is in the transfer (naming what you carry) and the visibility (seeing it all) — not in prescribing solutions
 
 ## Pull Requests
 
 - One feature per PR
-- Run `npm run build` before submitting (TypeScript must compile clean)
+- Run `npm run check` and `npm run test:e2e` before submitting
 - Update store migration version if you change the persisted data shape
 - Test backward compatibility — existing localStorage data must survive upgrades

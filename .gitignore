@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated release files and local secrets
+artifacts/
+test-results/
+playwright-report/
+.env*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+keystore.properties

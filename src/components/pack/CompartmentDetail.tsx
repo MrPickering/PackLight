@@ -25,7 +25,6 @@ export default function CompartmentDetail() {
   const setLighteningApproach = usePackStore(s => s.setLighteningApproach);
   const setNextStep = usePackStore(s => s.setNextStep);
   const completeNextStep = usePackStore(s => s.completeNextStep);
-  const markAsContainer = usePackStore(s => s.markAsContainer);
   const activeContext = usePackStore(s => s.profile.activeContext);
   const displayConfig = useDisplayMode();
 
@@ -49,7 +48,7 @@ export default function CompartmentDetail() {
 
   // Show root items for this compartment, filtered by active context
   let filtered = items.filter(i =>
-    i.compartment === comp && !i.droppedAt && !i.parentId &&
+    i.compartment === comp && !i.droppedAt && (!i.parentId || items.find(parent => parent.id === i.parentId)?.compartment !== comp) &&
     (activeContext === null || i.contexts.includes(activeContext) || i.contexts.length === 0)
   );
   if (deadWeightOnly) filtered = filtered.filter(i => {
@@ -77,11 +76,6 @@ export default function CompartmentDetail() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
-
-  const handleUnpack = (item: PackItem) => {
-    markAsContainer(item.id);
-    setAddParent({ id: item.id, name: item.name });
   };
 
   const renderItem = (item: PackItem, depth: number = 0) => {
